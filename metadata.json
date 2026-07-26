@@ -1,0 +1,6 @@
+{
+  "name": "우체국보험회관 자산관리 및 임대분석 대시보드",
+  "description": "우체국금융개발원이 보유한 우체국보험회관 부동산 자산 현황을 조회하고인근 시세 빅데이터 기반의 임대료 추정 및 다목적 자산 가치 평가 체계를 제공하는 전문 자산 분석 대시보드입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
