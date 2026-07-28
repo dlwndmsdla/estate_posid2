@@ -63,6 +63,7 @@ export function BuildingCalculationView({
   const [appliedZoneFactor, setAppliedZoneFactor] = useState<number>(1.085);
   const [appliedSizeFactor, setAppliedSizeFactor] = useState<number>(1.0);
   const [appliedAgeFactor, setAppliedAgeFactor] = useState<number>(1.0);
+  const [appliedMarketFactor, setAppliedMarketFactor] = useState<number>(1.0);
   const [actualContractRentInput, setActualContractRentInput] = useState<number>(13300);
   const [adjustmentReason, setAdjustmentReason] = useState<string>("");
   const [expandedCard, setExpandedCard] = useState<"zone" | "size" | "age" | null>(null);
@@ -368,11 +369,13 @@ export function BuildingCalculationView({
         setAppliedZoneFactor(confirmed.appliedFactors.zone);
         setAppliedSizeFactor(confirmed.appliedFactors.size);
         setAppliedAgeFactor(confirmed.appliedFactors.age);
+        setAppliedMarketFactor(confirmed.appliedFactors.marketPolicy ?? 1.000);
         setAdjustmentReason(confirmed.adjustmentReason);
       } else {
         setAppliedZoneFactor(calc.recommendedFactors.zone);
         setAppliedSizeFactor(calc.recommendedFactors.size);
         setAppliedAgeFactor(calc.recommendedFactors.age);
+        setAppliedMarketFactor(calc.recommendedFactors.marketPolicy ?? 1.000);
         setAdjustmentReason("추천 보정계수 원안 수용");
       }
 
@@ -439,9 +442,10 @@ export function BuildingCalculationView({
     calculationResult &&
     (appliedZoneFactor !== calculationResult.recommendedFactors.zone ||
       appliedSizeFactor !== calculationResult.recommendedFactors.size ||
-      appliedAgeFactor !== calculationResult.recommendedFactors.age);
+      appliedAgeFactor !== calculationResult.recommendedFactors.age ||
+      appliedMarketFactor !== (calculationResult.recommendedFactors.marketPolicy ?? 1.000));
 
-  const appliedTotalFactor = Number((appliedZoneFactor * appliedSizeFactor * appliedAgeFactor).toFixed(3));
+  const appliedTotalFactor = Number((appliedZoneFactor * appliedSizeFactor * appliedAgeFactor * appliedMarketFactor).toFixed(3));
   const calculatedFinalRent = calculationResult
     ? Math.round(calculationResult.baseRegionalRent * appliedTotalFactor)
     : 0;
@@ -466,6 +470,7 @@ export function BuildingCalculationView({
           zone: appliedZoneFactor,
           size: appliedSizeFactor,
           age: appliedAgeFactor,
+          marketPolicy: appliedMarketFactor,
         },
         observedTotalFactor: calculationResult.observedFactors.total,
         recommendedTotalFactor: calculationResult.recommendedFactors.total,
@@ -1131,9 +1136,10 @@ export function BuildingCalculationView({
                     setAppliedZoneFactor(calculationResult.observedFactors.zone);
                     setAppliedSizeFactor(calculationResult.observedFactors.size);
                     setAppliedAgeFactor(calculationResult.observedFactors.age);
+                    setAppliedMarketFactor(calculationResult.observedFactors.marketPolicy ?? 1.000);
                     setAdjustmentReason("추천(관측) 보정계수 원안 수용");
                   }}
-                  className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg transition"
+                  className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg transition cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" />
                   추천(관측) 보정계수 초기화
@@ -1244,6 +1250,44 @@ export function BuildingCalculationView({
                     className="w-full accent-amber-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
                   />
                   <div className="flex justify-between text-[9px] text-slate-400 font-mono">
+                    <span>0.500 (-50%)</span>
+                    <span>1.000 (기준)</span>
+                    <span>2.000 (+100%)</span>
+                  </div>
+                </div>
+
+                {/* Market Policy / Manager Factor Slider */}
+                <div className="space-y-1.5 bg-purple-50/50 p-3 rounded-xl border border-purple-200/80">
+                  <div className="flex justify-between items-center font-bold">
+                    <span className="text-purple-900 flex items-center gap-1">
+                      <span>담당자/시장상황 반영계수 ($K_{`시장적용`}$)</span>
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-purple-600 font-semibold">수기조정:</span>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0.500"
+                        max="2.000"
+                        value={appliedMarketFactor}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val)) setAppliedMarketFactor(Number(val.toFixed(3)));
+                        }}
+                        className="w-20 px-2 py-0.5 text-right font-mono font-black text-purple-700 bg-purple-100/80 border border-purple-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      />
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.500"
+                    max="2.000"
+                    step="0.001"
+                    value={appliedMarketFactor}
+                    onChange={(e) => setAppliedMarketFactor(Number(parseFloat(e.target.value).toFixed(3)))}
+                    className="w-full accent-purple-600 cursor-pointer h-1.5 bg-purple-200 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[9px] text-purple-500 font-mono">
                     <span>0.500 (-50%)</span>
                     <span>1.000 (기준)</span>
                     <span>2.000 (+100%)</span>

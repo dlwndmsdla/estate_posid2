@@ -73,20 +73,20 @@ export default function App() {
     // Single token fallback resolution
     const legacyMap: Record<string, [MainMenuId, SubMenuId]> = {
       dashboard: ["overview", "dashboard"],
-      "building-summary": ["overview", "building-summary"],
+      "building-summary": ["overview", "dashboard"],
+      valuation: ["overview", "valuation"],
+      calculation: ["overview", "valuation"],
       "quarter-comparison": ["overview", "quarter-comparison"],
       alerts: ["overview", "alerts"],
+      eda: ["data", "eda"],
+      conversion: ["data", "conversion"],
+      calibration: ["data", "adjustment"],
+      adjustment: ["data", "adjustment"],
+      comparables: ["data", "comparables"],
       upload: ["data", "upload"],
       validation: ["data", "validation"],
       datasets: ["data", "datasets"],
       "column-mapping": ["data", "column-mapping"],
-      eda: ["analysis", "eda"],
-      conversion: ["analysis", "conversion"],
-      valuation: ["analysis", "valuation"],
-      calculation: ["analysis", "valuation"],
-      calibration: ["analysis", "adjustment"],
-      adjustment: ["analysis", "adjustment"],
-      comparables: ["analysis", "comparables"],
       history: ["history", "quarterly-history"],
       "quarterly-history": ["history", "quarterly-history"],
       "change-history": ["history", "change-history"],
@@ -151,20 +151,20 @@ export default function App() {
     // Check legacy single token
     const legacyMap: Record<string, [MainMenuId, SubMenuId]> = {
       dashboard: ["overview", "dashboard"],
-      "building-summary": ["overview", "building-summary"],
+      "building-summary": ["overview", "dashboard"],
+      valuation: ["overview", "valuation"],
+      calculation: ["overview", "valuation"],
       "quarter-comparison": ["overview", "quarter-comparison"],
       alerts: ["overview", "alerts"],
+      eda: ["data", "eda"],
+      conversion: ["data", "conversion"],
+      calibration: ["data", "adjustment"],
+      adjustment: ["data", "adjustment"],
+      comparables: ["data", "comparables"],
       upload: ["data", "upload"],
       validation: ["data", "validation"],
       datasets: ["data", "datasets"],
       "column-mapping": ["data", "column-mapping"],
-      eda: ["analysis", "eda"],
-      conversion: ["analysis", "conversion"],
-      valuation: ["analysis", "valuation"],
-      calculation: ["analysis", "valuation"],
-      calibration: ["analysis", "adjustment"],
-      adjustment: ["analysis", "adjustment"],
-      comparables: ["analysis", "comparables"],
       history: ["history", "quarterly-history"],
       "quarterly-history": ["history", "quarterly-history"],
       "change-history": ["history", "change-history"],
@@ -228,7 +228,7 @@ export default function App() {
 
         {/* Sub-view Content Body */}
         <div className="min-w-0 space-y-4">
-            {/* 1. 종합 현황 (overview) */}
+            {/* 1. 종합 현황 및 산정 (overview) */}
             {activeMainMenu === "overview" && (
               <>
                 {activeSubMenu === "dashboard" && (
@@ -237,8 +237,13 @@ export default function App() {
                     onNavigateTab={handleNavigate}
                   />
                 )}
-                {activeSubMenu === "building-summary" && (
-                  <BuildingSummarySubView selectedDatasetId={selectedDatasetId} />
+                {activeSubMenu === "valuation" && (
+                  <BuildingCalculationView
+                    selectedDatasetId={selectedDatasetId}
+                    onValuationConfirmed={async (dsId) => {
+                      await refreshDatasets(dsId);
+                    }}
+                  />
                 )}
                 {activeSubMenu === "quarter-comparison" && (
                   <QuarterComparisonSubView selectedDatasetId={selectedDatasetId} />
@@ -249,9 +254,26 @@ export default function App() {
               </>
             )}
 
-            {/* 2. 데이터 관리 (data) */}
+            {/* 2. 데이터 및 보정 관리 (data) */}
             {activeMainMenu === "data" && (
               <>
+                {activeSubMenu === "eda" && (
+                  <EdaDashboardView
+                    selectedDatasetId={selectedDatasetId}
+                    onNavigateTab={(target) => {
+                      if (target === "calibration" || target === "adjustment") {
+                        handleNavigate("data", "adjustment");
+                      } else {
+                        handleNavigate(target);
+                      }
+                    }}
+                  />
+                )}
+                {activeSubMenu === "conversion" && <ConversionSubView />}
+                {activeSubMenu === "adjustment" && (
+                  <CalibrationFactorsView selectedDatasetId={selectedDatasetId} />
+                )}
+                {activeSubMenu === "comparables" && <ComparableListingsSubView />}
                 {activeSubMenu === "upload" && (
                   <UploadDatasetView
                     existingDatasets={datasets}
@@ -266,7 +288,7 @@ export default function App() {
                     selectedDatasetId={selectedDatasetId}
                     onCalculationExecuted={async (dsId) => {
                       await refreshDatasets(dsId);
-                      handleNavigate("analysis", "valuation");
+                      handleNavigate("overview", "valuation");
                     }}
                   />
                 )}
@@ -275,38 +297,7 @@ export default function App() {
               </>
             )}
 
-            {/* 3. 임대가격 분석 (analysis) */}
-            {activeMainMenu === "analysis" && (
-              <>
-                {activeSubMenu === "eda" && (
-                  <EdaDashboardView
-                    selectedDatasetId={selectedDatasetId}
-                    onNavigateTab={(target) => {
-                      if (target === "calibration" || target === "adjustment") {
-                        handleNavigate("analysis", "adjustment");
-                      } else {
-                        handleNavigate(target);
-                      }
-                    }}
-                  />
-                )}
-                {activeSubMenu === "conversion" && <ConversionSubView />}
-                {activeSubMenu === "valuation" && (
-                  <BuildingCalculationView
-                    selectedDatasetId={selectedDatasetId}
-                    onValuationConfirmed={async (dsId) => {
-                      await refreshDatasets(dsId);
-                    }}
-                  />
-                )}
-                {activeSubMenu === "adjustment" && (
-                  <CalibrationFactorsView selectedDatasetId={selectedDatasetId} />
-                )}
-                {activeSubMenu === "comparables" && <ComparableListingsSubView />}
-              </>
-            )}
-
-            {/* 4. 이력·기준 관리 (history) */}
+            {/* 3. 이력·기준 관리 (history) */}
             {activeMainMenu === "history" && (
               <>
                 {activeSubMenu === "quarterly-history" && <QuarterlyHistoryView />}

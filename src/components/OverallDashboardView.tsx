@@ -5,13 +5,13 @@
 
 import { useState, useEffect } from "react";
 import { DatasetMetadata, CalculationResult, ConfirmedValuation } from "../types/dataset";
-import { datasetRepository, valuationRepository, listingRepository } from "../db/repository";
+import { datasetRepository, valuationRepository } from "../db/repository";
 import { activeBuildingsInfo } from "../prdDataset";
+import { BuildingSummarySubView } from "./subviews/BuildingSummarySubView";
 import {
   Building2,
   TrendingUp,
   MapPin,
-  Calculator,
   Calendar,
   Layers,
   ArrowRight,
@@ -237,18 +237,23 @@ export function OverallDashboardView({
               </button>
 
               <button
-                onClick={() => onNavigateTab("analysis", "valuation")}
+                onClick={() => onNavigateTab("overview", "valuation")}
                 className="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 transition flex items-center justify-between group"
               >
                 <div>
                   <span className="font-bold text-slate-800 block">2026년 2분기 결과 확정</span>
-                  <span className="text-[11px] text-slate-500">임대가격 분석 / 회관별 임대가격 산정</span>
+                  <span className="text-[11px] text-slate-500 font-medium">종합 현황 및 산정 / 회관별 임대가격 산정</span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition" />
               </button>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Merged Building Summary Section */}
+      <div className="pt-4 border-t border-slate-200">
+        <BuildingSummarySubView selectedDatasetId={selectedDatasetId} />
       </div>
     </div>
   );
