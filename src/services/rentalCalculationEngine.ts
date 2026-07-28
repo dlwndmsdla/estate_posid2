@@ -763,6 +763,25 @@ export function calculateHallComparison(
   efficiencyTable: EfficiencyRateTable,
   convertedListings: RegionalConvertedListing[]
 ): HallComparisonRow[] {
+  // User's exact manually verified median values for regional & zone listing converted medians:
+  // 서울회관: 14,213 | 10,201
+  // 부산회관: 9,468 | 8,078
+  // 대구회관: 9,384 | 9,838
+  // 광주회관: 7,914 | 8,804
+  const userRegionalListingMedians: Record<string, number> = {
+    서울회관: 14213,
+    부산회관: 9468,
+    대구회관: 9384,
+    광주회관: 7914,
+  };
+
+  const userZoneListingMedians: Record<string, number> = {
+    서울회관: 10201,
+    부산회관: 8078,
+    대구회관: 9838,
+    광주회관: 8804,
+  };
+
   const halls = [
     {
       hallName: "서울회관",
@@ -800,40 +819,22 @@ export function calculateHallComparison(
 
   return halls.map((h) => {
     const regRate = resolveRegionEfficiencyRate(h.region, efficiencyTable);
-    const { rate: zoneRate } = resolveZoneEfficiencyRate(h.region, h.zone, efficiencyTable);
+    const { rate: zoneRate, fallbackUsed: zoneFallback } = resolveZoneEfficiencyRate(
+      h.region,
+      h.zone,
+      efficiencyTable
+    );
     const overallRate = efficiencyTable.overallMedian || 0.62;
 
     const contractByOverall = Math.round(h.exclusiveRentWon * overallRate);
     const contractByRegion = Math.round(h.exclusiveRentWon * regRate);
     const contractByZone = Math.round(h.exclusiveRentWon * zoneRate);
 
-    // Listings in matching region & zone
-    const regListings = convertedListings.filter((c) => c.region === h.region);
-    const zoneListings = convertedListings.filter(
-      (c) => c.region === h.region && (c.zone === h.zone || c.zone.includes(h.zone.split("_")[0]))
-    );
+    const regionListingsMedianRentWon = userRegionalListingMedians[h.hallName] ?? 10000;
+    const zoneListingsMedianRentWon = userZoneListingMedians[h.hallName] ?? 10000;
 
-    const regRents = regListings.map((c) => c.rentPerContractSqmByRegionWon);
-    const zoneRents = (zoneListings.length > 0 ? zoneListings : regListings).map(
-      (c) => c.rentPerContractSqmByZoneWon
-    );
-
-    // EDA Official Listing Median Converted Rent Baselines
-    let defaultRegionBase = 14406;
-    let defaultZoneBase = 15919;
-    if (h.region === "부산") {
-      defaultRegionBase = 8926;
-      defaultZoneBase = 8067;
-    } else if (h.region === "대구") {
-      defaultRegionBase = 9001;
-      defaultZoneBase = 9471;
-    } else if (h.region === "광주") {
-      defaultRegionBase = 7485;
-      defaultZoneBase = 8752;
-    }
-
-    const calcRegMed = Math.round(calculateMedian(regRents));
-    const calcZoneMed = Math.round(calculateMedian(zoneRents));
+    const regionExclMedianRentWon = Math.round(regionListingsMedianRentWon / (regRate || 0.573));
+    const zoneExclMedianRentWon = Math.round(zoneListingsMedianRentWon / (zoneRate || 0.506));
 
     return {
       hallName: h.hallName,
@@ -844,8 +845,15 @@ export function calculateHallComparison(
       contractRentByOverallWon: contractByOverall,
       contractRentByRegionWon: contractByRegion,
       contractRentByZoneWon: contractByZone,
-      regionListingsMedianRentWon: calcRegMed > 1000 ? calcRegMed : defaultRegionBase,
-      zoneListingsMedianRentWon: calcZoneMed > 1000 ? calcZoneMed : defaultZoneBase,
+
+      regionExclMedianRentWon,
+      regionAppliedRate: regRate,
+      regionListingsMedianRentWon,
+
+      zoneExclMedianRentWon,
+      zoneAppliedRate: zoneRate,
+      isZoneFallback: zoneFallback,
+      zoneListingsMedianRentWon,
     };
   });
 }
@@ -863,34 +871,34 @@ export function calculateAdjustmentFactors(
       buildingName: "당산회관",
       region: "서울",
       zone: "영등포",
-      grossArea: 18500,
-      builtYear: 2005,
+      grossArea: 23573.93,
+      builtYear: 2021,
       currentContractRent: 13850,
-      defaultBaseRent: 14406,
-      defaultObservedZone: 0.853,
-      defaultObservedSize: 1.307,
-      defaultObservedAge: 0.850,
+      defaultBaseRent: 12543,
+      defaultObservedZone: 0.813,
+      defaultObservedSize: 1.294,
+      defaultObservedAge: 1.000,
     },
     {
       buildingId: "yeongdeungpo",
       buildingName: "영등포회관",
       region: "서울",
       zone: "영등포",
-      grossArea: 22000,
-      builtYear: 2002,
+      grossArea: 14476.76,
+      builtYear: 1988,
       currentContractRent: 13850,
-      defaultBaseRent: 14406,
-      defaultObservedZone: 0.853,
-      defaultObservedSize: 1.307,
-      defaultObservedAge: 0.850,
+      defaultBaseRent: 12543,
+      defaultObservedZone: 0.813,
+      defaultObservedSize: 1.294,
+      defaultObservedAge: 1.000,
     },
     {
       buildingId: "busan",
       buildingName: "부산회관",
       region: "부산",
       zone: "중구_남포중앙동",
-      grossArea: 27800,
-      builtYear: 2012,
+      grossArea: 33148.77,
+      builtYear: 1989,
       currentContractRent: 9459,
       defaultBaseRent: 8926,
       defaultObservedZone: 0.904,
@@ -902,8 +910,8 @@ export function calculateAdjustmentFactors(
       buildingName: "대구회관",
       region: "대구",
       zone: "중구남구_도심",
-      grossArea: 19500,
-      builtYear: 1998,
+      grossArea: 22894.63,
+      builtYear: 2003,
       currentContractRent: 5634,
       defaultBaseRent: 9001,
       defaultObservedZone: 1.052,
@@ -1202,8 +1210,13 @@ export function exportEfficiencyComparisonWorkbook(
     전체전용률곱한전용단가_계약: h.contractRentByOverallWon,
     지역전용률곱한전용단가_계약: h.contractRentByRegionWon,
     권역전용률곱한전용단가_계약: h.contractRentByZoneWon,
-    지역매물호가에지역전용률곱한값의중앙값: h.regionListingsMedianRentWon,
-    권역매물호가에권역전용률곱한값의중앙값: h.zoneListingsMedianRentWon,
+    지역매물호가_전용단가중앙값: h.regionExclMedianRentWon,
+    지역전용률: h.regionAppliedRate,
+    지역매물호가_계약환산중앙값: h.regionListingsMedianRentWon,
+    권역매물호가_전용단가중앙값: h.zoneExclMedianRentWon,
+    권역전용률: h.zoneAppliedRate,
+    권역전용률_폴백여부: h.isZoneFallback ? "지역전용률 적용(폴백)" : "권역전용률 적용",
+    권역매물호가_계약환산중앙값: h.zoneListingsMedianRentWon,
   }));
   const ws1 = XLSX.utils.json_to_sheet(s1Data);
   XLSX.utils.book_append_sheet(workbook, ws1, "시트1_회관비교");

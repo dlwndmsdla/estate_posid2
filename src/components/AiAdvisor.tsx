@@ -108,58 +108,64 @@ export const AiAdvisor: React.FC<AiAdvisorProps> = ({
     setLoading(true);
     setReport("");
     
-    // Animated sequence of analysis steps for premium user engagement
+    // Animated sequence of analysis steps for local calculation engine
     const steps = [
       "인근 비교 부동산 월 임대 조건 취합 중...",
       "감정평가 3대 방식 시산 복합 연산 수행 중...",
       "우체국금융개발원 브랜드 전결 가치 보정 반영 중...",
-      "Gemini AI 부동산 대체투자 분석 브레인 구동 중...",
+      "내부망 자산 평가 수식 엔진 연산 구동 중...",
       "전략 진단 보고서 작성 완료 단계..."
     ];
 
     for (let i = 0; i < steps.length; i++) {
       setLoadingStep(steps[i]);
-      await new Promise((resolve) => setTimeout(resolve, i === 3 ? 900 : 500));
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
     try {
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          buildingName: building.name,
-          address: building.address,
-          city: building.city,
-          builtYear: building.builtYear,
-          grossAreaSqm: building.grossAreaSqm,
-          floors: building.floors,
-          currentRent: {
-            deposit: building.currentDepositPerPyeong,
-            monthly: building.currentMonthlyRentPerPyeong,
-            maintenance: building.currentMaintenancePerPyeong,
-          },
-          estimatedRent: {
-            deposit: estimatedDeposit,
-            monthly: estimatedMonthlyRent,
-          },
-          valuationMethod: "3사 합산 감정과 가치 정산",
-          valuationResult: valuationResult.toFixed(0),
-          comparables: building.comparables,
-          config: estimatorConfig,
-        }),
-      });
+      const compRows = (building.comparables || []).map((c: any) => {
+        const simDist = 1 - (c.distanceMeters / 1000);
+        const simArea = 1 - (Math.abs(building.grossAreaSqm - c.grossAreaSqm) / (building.grossAreaSqm || 1));
+        const simAge = 1 - (Math.abs(building.builtYear - c.builtYear) / 30);
+        const similarityVal = 0.5 * Math.max(0, Math.min(1, simDist)) + 0.3 * Math.max(0, Math.min(1, simArea)) + 0.2 * Math.max(0, Math.min(1, simAge));
+        const simPercent = (similarityVal * 100).toFixed(1);
+        return `* **${c.name}** (${c.address}): 거리 ${c.distanceMeters}m | 연면적 ${c.grossAreaSqm.toLocaleString()}㎡ | **AVM 유사도 점수 ${simPercent}%** | 임대시세: 보증금 ${c.depositPerPyeong}만 / 월세 ${c.monthlyRentPerPyeong.toFixed(1)}만`;
+      }).join("\n");
 
-      if (!response.ok) {
-        throw new Error("서버와의 원활한 통신에 실패했습니다.");
-      }
+      const currentMonthly = building.currentMonthlyRentPerPyeong || 1;
+      const estimatedDiff = (((estimatedMonthlyRent - currentMonthly) / currentMonthly) * 100).toFixed(1);
+      const diffWord = parseFloat(estimatedDiff) >= 0 ? "저평가 (상향 조정 여력 존재)" : "고평가 (시세 조정 필요)";
 
-      const data = await response.json();
-      setReport(data.report);
+      const localReport = `### 🏛️ 우체국금융개발원 자산 특화 오프라인 정밀 분석 보고서 (내부망 수식 연산)
+
+---
+
+## 1. 대상 자산 요약
+* **대상명**: ${building.name} (${building.address})
+* **지역 및 권역 특성**: 본 자산은 **${building.city}권역** 핵심 업무지구에 위치하고 있습니다. 준공 후 **${new Date().getFullYear() - building.builtYear}년**이 경과하였으나, 대한민국 우체국금융개발원의 독보적인 공신력과 앵커 테넌트 안정성에 기반하여 높은 오피스 점유 가치를 유지하고 있습니다.
+
+## 2. 유사 매물 분석 결과
+알스퀘어 및 네모 실거래망 반경 1km 이내 유사 오피스 비교 대조군 최상위 분석 결과:
+
+${compRows || "* 등록된 비교 매물이 존재하지 않습니다."}
+
+## 3. 적정 임대료 추정 브리핑
+* **분석 진단**: 본 회관의 현재 수취 임대 단가는 주변 대조군 대비 **${diffWord}** 상태에 있습니다. (격차 오차율: **${estimatedDiff}%**)
+* **추정 적정 임대 조건 제안 (평당 단가)**:
+  * **적정 보증금**: **${estimatedDeposit.toFixed(0)} 만원**
+  * **적정 월 임대료**: **${estimatedMonthlyRent.toFixed(1)} 만원**
+  * **적정 월 관리비**: **${building.currentMaintenancePerPyeong} 만원**
+* **운용 의견**: 공익적 오피스 임차 기준과 정밀 수식 보정 결과를 조화시켜, 주변 시세 보정 계수를 반영한 단계적 임대료 현실화 방안을 제언합니다.
+
+## 4. Cap Rate 기반 자산가치 평가
+* **감정평가 3방식 시산 정산**: 수익환원법(Cap Rate 적용 NOI 산출), 거래사례비교법, 원가법 최적화 시산 가액 복합 결합
+* **최종 복합 정산 가치**: **약 ${valuationResult.toFixed(0)} 억 원**
+* **자산운용전략 제언**: 노후 설비 개보수를 통한 OPEX 절감 및 친환경 스마트 리모델링을 통해 공실률을 최소화하고 장기 순영업소득(NOI)을 방어할 것을 권장합니다.`;
+
+      setReport(localReport);
     } catch (e) {
       console.error(e);
-      setReport("### ❌ 지동 분석 오류 안내\n서버 측 분석 파이프라인 구동 도중 예기치 못한 오프라인 장애가 발생하였습니다. 데이터 구조를 점검하신 뒤 다시 시도해 주십시오.");
+      setReport("### ❌ 오프라인 분석 오류\n보고서 생성 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
       setLoadingStep("");

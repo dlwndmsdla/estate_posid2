@@ -296,7 +296,7 @@ export function classifyBuildingSize(
     return null;
   }
 
-  if (grossFloorAreaSqm > 33058) {
+  if (grossFloorAreaSqm >= 33058) {
     return "대";
   }
 

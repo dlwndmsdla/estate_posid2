@@ -396,11 +396,16 @@ export function ConversionSubView() {
           </div>
 
           {/* Hall Comparison Summary Box */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-indigo-600" />
-              우체국보험회관 4개소 계약단가 환산 비교 (실거래가 vs 전용단가 환산)
-            </h3>
+          <div id="hall-comparison-summary-box" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h3 id="hall-comparison-summary-title" className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-indigo-600" />
+                우체국보험회관 4개소 계약단가 환산 비교 (실거래가 vs 전용단가 환산)
+              </h3>
+              <span className="text-[11px] text-slate-500 font-mono bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                ※ 환산산식 = 매물호가 전용단가 중앙값 × 적용 전용률
+              </span>
+            </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
@@ -410,16 +415,22 @@ export function ConversionSubView() {
                     <th className="p-2.5">권역</th>
                     <th className="p-2.5 text-right">실거래가 (원/㎡)</th>
                     <th className="p-2.5 text-right">전용단가 (원/㎡)</th>
-                    <th className="p-2.5 text-right">전체전용률 적용</th>
+                    <th className="p-2.5 text-right">전체전용률 (62%)</th>
                     <th className="p-2.5 text-right">지역전용률 적용</th>
-                    <th className="p-2.5 text-right bg-indigo-50 text-indigo-900">권역전용률 적용</th>
-                    <th className="p-2.5 text-right">지역 매물호가 중앙값</th>
-                    <th className="p-2.5 text-right">권역 매물호가 중앙값</th>
+                    <th className="p-2.5 text-right bg-indigo-50/70 text-indigo-900">권역전용률 적용</th>
+                    <th className="p-2.5 text-right bg-slate-200/50 text-slate-900">
+                      지역 매물호가 중앙값
+                      <span className="block text-[10px] font-normal text-slate-500">(전용호가 × 지역전용률)</span>
+                    </th>
+                    <th className="p-2.5 text-right bg-indigo-100/70 text-indigo-950 font-extrabold">
+                      권역 매물호가 중앙값
+                      <span className="block text-[10px] font-normal text-indigo-700">(전용호가 × 권역전용률)</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-mono">
                   {hallComparisonRows.map((h, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
                       <td className="p-2.5 font-sans font-bold text-slate-800">{h.hallName}</td>
                       <td className="p-2.5 font-sans text-slate-600">{h.zone}</td>
                       <td className="p-2.5 text-right font-medium text-slate-700">
@@ -434,14 +445,33 @@ export function ConversionSubView() {
                       <td className="p-2.5 text-right text-slate-600">
                         {h.contractRentByRegionWon.toLocaleString()}
                       </td>
-                      <td className="p-2.5 text-right font-extrabold text-indigo-700 bg-indigo-50/50">
+                      <td className="p-2.5 text-right font-extrabold text-indigo-700 bg-indigo-50/40">
                         {h.contractRentByZoneWon.toLocaleString()}
                       </td>
-                      <td className="p-2.5 text-right text-slate-600">
-                        {h.regionListingsMedianRentWon.toLocaleString()}
+
+                      {/* 지역 매물호가 중앙값 및 산식 */}
+                      <td className="p-2.5 text-right bg-slate-50/50">
+                        <div className="font-bold text-slate-800 text-sm">
+                          {h.regionListingsMedianRentWon.toLocaleString()} <span className="text-[11px] font-normal text-slate-500">원</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                          {h.regionExclMedianRentWon.toLocaleString()}원 × {(h.regionAppliedRate * 100).toFixed(1)}%
+                        </div>
                       </td>
-                      <td className="p-2.5 text-right font-bold text-slate-800">
-                        {h.zoneListingsMedianRentWon.toLocaleString()}
+
+                      {/* 권역 매물호가 중앙값 및 산식 (폴백 표기 포함) */}
+                      <td className="p-2.5 text-right bg-indigo-50/30">
+                        <div className="font-extrabold text-indigo-900 text-sm">
+                          {h.zoneListingsMedianRentWon.toLocaleString()} <span className="text-[11px] font-normal text-indigo-700">원</span>
+                        </div>
+                        <div className="text-[10px] text-indigo-800/80 font-mono mt-0.5 flex items-center justify-end gap-1">
+                          <span>{h.zoneExclMedianRentWon.toLocaleString()}원 × {(h.zoneAppliedRate * 100).toFixed(1)}%</span>
+                          {h.isZoneFallback && (
+                            <span className="text-[9px] text-amber-700 bg-amber-100 font-sans px-1 rounded font-bold" title="매물 수 부족(5건 미만)으로 지역 전용률 적용">
+                              (지역폴백)
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

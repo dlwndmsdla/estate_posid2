@@ -8,84 +8,108 @@ import { BuildingAdjustmentConfig } from "./types";
 export const initialAdjustmentConfigs: Record<string, BuildingAdjustmentConfig> = {
   // 서울회관 (당산 / 영등포)
   dangsan: {
-    baseRegionalRent: 14406,
+    baseRegionalRent: 12543,
     currentContractRent: 13487,
     zone: {
-      observedFactor: 0.853,
-      recommendedFactor: 0.853,
-      appliedFactor: 0.853,
+      observedFactor: 0.813,
+      recommendedFactor: 0.813,
+      appliedFactor: 0.813,
       sampleCount: 15,
-      confidenceLow: 0.814,
-      confidenceHigh: 0.920,
+      confidenceLow: 0.770,
+      confidenceHigh: 0.880,
       reliability: "높음",
-      reason: "권역 중앙값 11,884 / 지역 중앙값 14,406 = 0.853 반영",
-      baseGroupMedian: 14406,
-      targetGroupMedian: 11884,
+      reason: "권역 중앙값 10,201 / 지역 기준가 12,543 = 0.813 반영",
+      baseGroupMedian: 12543,
+      targetGroupMedian: 10201,
     },
     size: {
-      observedFactor: 1.307,
-      recommendedFactor: 1.307,
-      appliedFactor: 1.307,
+      observedFactor: 1.294,
+      recommendedFactor: 1.294,
+      appliedFactor: 1.294,
       sampleCount: 6,
       confidenceLow: 1.150,
       confidenceHigh: 1.450,
       reliability: "높음",
-      reason: "동일규모 중앙값 15,532 / 권역 중앙값 11,884 = 1.307 반영",
-      baseGroupMedian: 11884,
-      targetGroupMedian: 15532,
+      reason: "동일규모 중앙값 13,202 / 권역 중앙값 10,201 = 1.294 반영",
+      baseGroupMedian: 10201,
+      targetGroupMedian: 13202,
     },
     age: {
-      observedFactor: 0.850,
-      recommendedFactor: 0.850,
-      appliedFactor: 0.850,
+      observedFactor: 1.000,
+      recommendedFactor: 1.000,
+      appliedFactor: 1.000,
       sampleCount: 5,
-      confidenceLow: 0.750,
-      confidenceHigh: 0.950,
-      reliability: "보통",
-      reason: "유사연식·유사규모 중앙값 13,202 / 유사규모 중앙값 15,532 = 0.850 반영",
-      baseGroupMedian: 15532,
+      confidenceLow: 0.900,
+      confidenceHigh: 1.100,
+      reliability: "높음",
+      reason: "유사연식·유사규모 중앙값 13,202 / 유사규모 중앙값 13,202 = 1.000 반영",
+      baseGroupMedian: 13202,
+      targetGroupMedian: 13202,
+    },
+    marketPolicy: {
+      observedFactor: 1.000,
+      recommendedFactor: 1.000,
+      appliedFactor: 1.000,
+      sampleCount: 1,
+      confidenceLow: 0.900,
+      confidenceHigh: 1.100,
+      reliability: "높음",
+      reason: "인근 오피스 공실률 및 시장 상황 보정 (기본 1.000)",
+      baseGroupMedian: 13202,
       targetGroupMedian: 13202,
     },
     adjustmentReason: "",
   },
 
   yeongdeungpo: {
-    baseRegionalRent: 14406,
+    baseRegionalRent: 12543,
     currentContractRent: 13850,
     zone: {
-      observedFactor: 0.853,
-      recommendedFactor: 0.853,
-      appliedFactor: 0.853,
+      observedFactor: 0.813,
+      recommendedFactor: 0.813,
+      appliedFactor: 0.813,
       sampleCount: 15,
-      confidenceLow: 0.814,
-      confidenceHigh: 0.920,
+      confidenceLow: 0.770,
+      confidenceHigh: 0.880,
       reliability: "높음",
-      reason: "권역 중앙값 11,884 / 지역 중앙값 14,406 = 0.853 반영",
-      baseGroupMedian: 14406,
-      targetGroupMedian: 11884,
+      reason: "권역 중앙값 10,201 / 지역 기준가 12,543 = 0.813 반영",
+      baseGroupMedian: 12543,
+      targetGroupMedian: 10201,
     },
     size: {
-      observedFactor: 1.307,
-      recommendedFactor: 1.307,
-      appliedFactor: 1.307,
+      observedFactor: 1.294,
+      recommendedFactor: 1.294,
+      appliedFactor: 1.294,
       sampleCount: 6,
       confidenceLow: 1.150,
       confidenceHigh: 1.450,
       reliability: "높음",
-      reason: "동일규모 중앙값 15,532 / 권역 중앙값 11,884 = 1.307 반영",
-      baseGroupMedian: 11884,
-      targetGroupMedian: 15532,
+      reason: "동일규모 중앙값 13,202 / 권역 중앙값 10,201 = 1.294 반영",
+      baseGroupMedian: 10201,
+      targetGroupMedian: 13202,
     },
     age: {
-      observedFactor: 0.850,
-      recommendedFactor: 0.850,
-      appliedFactor: 0.850,
+      observedFactor: 1.000,
+      recommendedFactor: 1.000,
+      appliedFactor: 1.000,
       sampleCount: 5,
-      confidenceLow: 0.750,
-      confidenceHigh: 0.950,
-      reliability: "보통",
-      reason: "유사연식·유사규모 중앙값 13,202 / 유사규모 중앙값 15,532 = 0.850 반영",
-      baseGroupMedian: 15532,
+      confidenceLow: 0.900,
+      confidenceHigh: 1.100,
+      reliability: "높음",
+      reason: "유사연식·유사규모 중앙값 13,202 / 유사규모 중앙값 13,202 = 1.000 반영",
+      baseGroupMedian: 13202,
+      targetGroupMedian: 13202,
+    },
+    marketPolicy: {
+      observedFactor: 1.000,
+      recommendedFactor: 1.000,
+      appliedFactor: 1.000,
+      sampleCount: 1,
+      confidenceLow: 0.900,
+      confidenceHigh: 1.100,
+      reliability: "높음",
+      reason: "인근 오피스 공실률 및 시장 상황 보정 (기본 1.000)",
+      baseGroupMedian: 13202,
       targetGroupMedian: 13202,
     },
     adjustmentReason: "",
@@ -131,6 +155,18 @@ export const initialAdjustmentConfigs: Record<string, BuildingAdjustmentConfig> 
       baseGroupMedian: 9255,
       targetGroupMedian: 8385,
     },
+    marketPolicy: {
+      observedFactor: 1.000,
+      recommendedFactor: 1.000,
+      appliedFactor: 1.000,
+      sampleCount: 1,
+      confidenceLow: 0.900,
+      confidenceHigh: 1.100,
+      reliability: "높음",
+      reason: "인근 오피스 공실률 및 시장 상황 보정 (기본 1.000)",
+      baseGroupMedian: 8385,
+      targetGroupMedian: 8385,
+    },
     adjustmentReason: "",
   },
 
@@ -172,6 +208,18 @@ export const initialAdjustmentConfigs: Record<string, BuildingAdjustmentConfig> 
       reliability: "보통",
       reason: "유사연식·유사규모 중앙값 7,827 / 유사규모 중앙값 9,592 = 0.816 반영",
       baseGroupMedian: 9592,
+      targetGroupMedian: 7827,
+    },
+    marketPolicy: {
+      observedFactor: 1.000,
+      recommendedFactor: 1.000,
+      appliedFactor: 1.000,
+      sampleCount: 1,
+      confidenceLow: 0.900,
+      confidenceHigh: 1.100,
+      reliability: "높음",
+      reason: "인근 오피스 공실률 및 시장 상황 보정 (기본 1.000)",
+      baseGroupMedian: 7827,
       targetGroupMedian: 7827,
     },
     adjustmentReason: "",
@@ -217,21 +265,37 @@ export const initialAdjustmentConfigs: Record<string, BuildingAdjustmentConfig> 
       baseGroupMedian: 8190,
       targetGroupMedian: 8190,
     },
+    marketPolicy: {
+      observedFactor: 1.000,
+      recommendedFactor: 1.000,
+      appliedFactor: 1.000,
+      sampleCount: 1,
+      confidenceLow: 0.900,
+      confidenceHigh: 1.100,
+      reliability: "높음",
+      reason: "인근 오피스 공실률 및 시장 상황 보정 (기본 1.000)",
+      baseGroupMedian: 8190,
+      targetGroupMedian: 8190,
+    },
     adjustmentReason: "",
   },
 };
 
 export function calculateAdjustmentSummary(config: BuildingAdjustmentConfig) {
-  const { baseRegionalRent, currentContractRent, zone, size, age } = config;
+  const { baseRegionalRent, currentContractRent, zone, size, age, marketPolicy } = config;
 
-  // 관측 종합보정계수: K관측 = K권역관측 * K규모관측 * K연식관측
-  const totalObservedFactor = zone.observedFactor * size.observedFactor * age.observedFactor;
+  const mObserved = marketPolicy?.observedFactor ?? 1.0;
+  const mRecommended = marketPolicy?.recommendedFactor ?? 1.0;
+  const mApplied = marketPolicy?.appliedFactor ?? 1.0;
 
-  // AI 추천 종합보정계수: K추천 = K권역추천 * K규모추천 * K연식추천
-  const totalRecommendedFactor = zone.recommendedFactor * size.recommendedFactor * age.recommendedFactor;
+  // 관측 종합보정계수
+  const totalObservedFactor = zone.observedFactor * size.observedFactor * age.observedFactor * mObserved;
 
-  // 담당자 종합보정계수: K담당자 = K권역담당자 * K규모담당자 * K연식담당자
-  const totalAppliedFactor = zone.appliedFactor * size.appliedFactor * age.appliedFactor;
+  // AI 추천 종합보정계수
+  const totalRecommendedFactor = zone.recommendedFactor * size.recommendedFactor * age.recommendedFactor * mRecommended;
+
+  // 담당자 종합보정계수
+  const totalAppliedFactor = zone.appliedFactor * size.appliedFactor * age.appliedFactor * mApplied;
 
   // 관측 적정 임대기준가격: R관측 = R기준 * K관측
   const observedRent = Math.round(baseRegionalRent * totalObservedFactor);

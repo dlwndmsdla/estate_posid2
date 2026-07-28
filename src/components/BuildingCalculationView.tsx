@@ -18,6 +18,11 @@ import {
 import { compareQuarterDatasets } from "../services/calculationEngine";
 import { activeBuildingsInfo } from "../prdDataset";
 import {
+  getActualContractStore,
+  saveActualContractRent,
+  calculateConversionFactor,
+} from "../services/actualContractStore";
+import {
   Calculator,
   Building2,
   Sliders,
@@ -31,6 +36,8 @@ import {
   RotateCcw,
   Info,
   Calendar,
+  Clock,
+  FileText,
 } from "lucide-react";
 
 interface BuildingCalculationViewProps {
@@ -56,9 +63,16 @@ export function BuildingCalculationView({
   const [appliedZoneFactor, setAppliedZoneFactor] = useState<number>(1.085);
   const [appliedSizeFactor, setAppliedSizeFactor] = useState<number>(1.0);
   const [appliedAgeFactor, setAppliedAgeFactor] = useState<number>(1.0);
+  const [actualContractRentInput, setActualContractRentInput] = useState<number>(13300);
   const [adjustmentReason, setAdjustmentReason] = useState<string>("");
   const [expandedCard, setExpandedCard] = useState<"zone" | "size" | "age" | null>(null);
   const [operatorName, setOperatorName] = useState<string>("자산운영팀장");
+
+  useEffect(() => {
+    const store = getActualContractStore();
+    const prevRent = store[selectedBuildingId] ?? Math.round((previousQuarterInfo?.finalRent || 14000) * 0.95);
+    setActualContractRentInput(prevRent);
+  }, [selectedBuildingId, previousQuarterInfo]);
 
   const safeFactor = (num: number, denom: number) => (denom > 0 ? Number((num / denom).toFixed(3)) : 1.0);
 
@@ -71,7 +85,7 @@ export function BuildingCalculationView({
 
   const sanitizeCalculationResult = (rawCalc: CalculationResult, buildingId: string): CalculationResult => {
     const buildingSpec = activeBuildingsInfo.find((b) => b.id === buildingId) || activeBuildingsInfo[0];
-    const basePrice = rawCalc.baseRegionalRent || (buildingSpec.id === "busan" ? 8926 : buildingSpec.id === "daegu" ? 9001 : buildingSpec.id === "gwangju" ? 7485 : 14406);
+    const basePrice = rawCalc.baseRegionalRent || (buildingSpec.id === "busan" ? 8926 : buildingSpec.id === "daegu" ? 9001 : buildingSpec.id === "gwangju" ? 7485 : 12543);
     
     const grossArea = rawCalc.sizeFactorDetail?.hallGrossAreaSqm || buildingSpec.grossAreaSqm || (buildingSpec.id === "busan" ? 38500 : buildingSpec.id === "daegu" ? 19500 : buildingSpec.id === "gwangju" ? 24200 : 23150);
     const sizeCat = rawCalc.sizeFactorDetail?.hallSizeCategory || (grossArea >= 30000 ? "대" : grossArea >= 15000 ? "중" : "소");
@@ -147,10 +161,16 @@ export function BuildingCalculationView({
         age: actualAgeObs,
         total: Number((actualZoneObs * actualSizeObs * actualAgeObs).toFixed(3)),
       },
+      recommendedFactors: {
+        zone: actualZoneObs,
+        size: actualSizeObs,
+        age: actualAgeObs,
+        total: Number((actualZoneObs * actualSizeObs * actualAgeObs).toFixed(3)),
+      },
       zoneFactorDetail: {
         ...rawCalc.zoneFactorDetail,
         observedFactor: actualZoneObs,
-        recommendedFactor: rawCalc.zoneFactorDetail?.recommendedFactor ?? actualZoneObs,
+        recommendedFactor: actualZoneObs,
         appliedFactor: rawCalc.zoneFactorDetail?.appliedFactor ?? actualZoneObs,
         sampleCount: rawCalc.zoneFactorDetail?.sampleCount ?? zoneTargetCount,
         q1: rawCalc.zoneFactorDetail?.q1 ?? Math.round(zoneTargetMedian * 0.95),
@@ -172,7 +192,7 @@ export function BuildingCalculationView({
       sizeFactorDetail: {
         ...rawCalc.sizeFactorDetail,
         observedFactor: actualSizeObs,
-        recommendedFactor: rawCalc.sizeFactorDetail?.recommendedFactor ?? actualSizeObs,
+        recommendedFactor: actualSizeObs,
         appliedFactor: rawCalc.sizeFactorDetail?.appliedFactor ?? actualSizeObs,
         sampleCount: rawCalc.sizeFactorDetail?.sampleCount ?? sizeTargetCount,
         q1: rawCalc.sizeFactorDetail?.q1 ?? Math.round(sizeTargetMedian * 0.95),
@@ -196,7 +216,7 @@ export function BuildingCalculationView({
       ageFactorDetail: {
         ...rawCalc.ageFactorDetail,
         observedFactor: actualAgeObs,
-        recommendedFactor: rawCalc.ageFactorDetail?.recommendedFactor ?? actualAgeObs,
+        recommendedFactor: actualAgeObs,
         appliedFactor: rawCalc.ageFactorDetail?.appliedFactor ?? actualAgeObs,
         sampleCount: rawCalc.ageFactorDetail?.sampleCount ?? ageTargetCount,
         q1: rawCalc.ageFactorDetail?.q1 ?? Math.round(ageTargetMedian * 0.95),
@@ -505,56 +525,128 @@ export function BuildingCalculationView({
         </div>
       </div>
 
-      {/* Building Specifications Banner */}
-      <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-indigo-400 font-mono text-xs">
-            <span>{activeSpec.city}</span> • <span>{activeSpec.tradeArea}</span>
-          </div>
-          <h2 className="text-lg md:text-xl font-black mt-0.5">{activeSpec.name}</h2>
-          <p className="text-xs text-slate-400 mt-1">
-            준공년도: {activeSpec.builtYear}년 ({new Date().getFullYear() - activeSpec.builtYear}년 경과) • 연면적:{" "}
-            {activeSpec.grossAreaSqm.toLocaleString()} ㎡ • 전용률: {activeSpec.efficiencyRate}%
-          </p>
-        </div>
+      {/* Executive Valuation Summary Hero Box */}
+      {calculationResult && (
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-xl border border-indigo-500/30 space-y-4">
+          {/* Header Row */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-indigo-500/20 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-indigo-500/30 text-indigo-300 font-bold font-mono text-[11px] px-2.5 py-0.5 rounded-full border border-indigo-400/30 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-indigo-400" />
+                  VALUATION EXECUTIVE SUMMARY
+                </span>
+                <span className="text-xs text-slate-300 font-medium">
+                  {activeSpec.city} • {activeSpec.tradeArea} • {activeSpec.name}
+                </span>
+              </div>
+              <h2 className="text-xl font-extrabold text-white mt-1 flex items-center gap-2">
+                <span>{activeSpec.name} 임대가격 산정 결과</span>
+                <span className="text-xs text-slate-400 font-normal">
+                  (연면적 {activeSpec.grossAreaSqm.toLocaleString()}㎡, 준공 {activeSpec.builtYear}년, 전용률 {activeSpec.efficiencyRate}%)
+                </span>
+              </h2>
+            </div>
 
-        {confirmedValuation ? (
-          <div className="bg-emerald-500/20 border border-emerald-500/40 p-3 rounded-xl text-right shrink-0">
-            <span className="text-[10px] text-emerald-300 font-bold block">최종 임대기준가격 확정됨</span>
-            <span className="text-xl font-black font-mono text-emerald-200">
-              {confirmedValuation.finalRent.toLocaleString()} 원/㎡/월
-            </span>
+            {/* Status badge */}
+            {confirmedValuation ? (
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                담당자 최종 확정 완료 ({confirmedValuation.confirmedBy})
+              </span>
+            ) : (
+              <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0">
+                <Clock className="w-4 h-4 text-indigo-400" />
+                2026년 2분기 임대가격 산정 진행 중
+              </span>
+            )}
           </div>
-        ) : (
-          <div className="bg-indigo-500/20 border border-indigo-500/40 p-3 rounded-xl text-right shrink-0">
-            <span className="text-[10px] text-indigo-300 font-bold block">AI 추천 적정 임대기준가격</span>
-            <span className="text-xl font-black font-mono text-indigo-200">
-              {calculationResult?.recommendedRent.toLocaleString()} 원/㎡/월
-            </span>
-          </div>
-        )}
-      </div>
 
-      {/* Contract Area Conversion Benchmark Banner */}
-      <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3 text-xs text-indigo-950 shadow-sm">
-        <Sparkles className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-indigo-900 bg-indigo-200/80 px-2 py-0.5 rounded text-[11px]">
-              단가 기준 정의: 계약면적 환산 단가
-            </span>
-            <span className="text-indigo-700 font-semibold text-[11px]">
-              (전용면적 기준 호가 사용 안함)
-            </span>
+          {/* Eye-catching Price Comparison Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-1">
+            {/* 1. MOST PROMINENT EYE-CATCHER: [현재 산정가] (7 Cols on desktop) */}
+            <div className="md:col-span-7 bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 p-5 rounded-2xl border-2 border-indigo-300/80 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-indigo-950 bg-amber-300 px-3 py-0.5 rounded-full shadow-xs uppercase tracking-wider flex items-center gap-1">
+                  ★ 핵심 확정/산정 가격
+                </span>
+                <span className="text-xs text-indigo-200 font-mono font-bold">2026년 2분기</span>
+              </div>
+
+              <div className="my-3">
+                <span className="text-xs font-bold text-indigo-200 block">현재 산정가 (계약면적 기준)</span>
+                <div className="text-3xl md:text-4xl lg:text-5xl font-black font-mono text-white tracking-tight mt-1 drop-shadow-sm">
+                  {calculatedFinalRent.toLocaleString()}{" "}
+                  <span className="text-lg md:text-xl font-bold text-indigo-200 font-sans">원/㎡/월</span>
+                </div>
+              </div>
+
+              <div className="text-xs text-indigo-100 font-medium bg-black/25 p-2.5 rounded-xl flex items-center justify-between border border-white/10">
+                <span>적용 총 보정계수: <strong className="font-mono text-amber-300">{appliedTotalFactor.toFixed(3)}</strong></span>
+                <span className="text-[11px] bg-white/20 px-2 py-0.5 rounded font-mono font-bold">
+                  {confirmedValuation ? "담당자 최종 확정가" : "AI 모델 현재 산정가"}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. SECONDARY HIGHLIGHT: [전분기 확정 기준가] (5 Cols on desktop) */}
+            <div className="md:col-span-5 bg-slate-800/90 p-5 rounded-2xl border border-slate-700 flex flex-col justify-between shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-200 bg-slate-700/80 px-2.5 py-0.5 rounded-full">
+                  비교 지표 (전분기)
+                </span>
+                <span className="text-xs text-slate-400 font-mono font-bold">
+                  {previousQuarterInfo?.label || "2026년 1분기"}
+                </span>
+              </div>
+
+              <div className="my-2">
+                <span className="text-xs font-bold text-slate-400 block">전분기 확정 기준가</span>
+                <div className="text-2xl md:text-3xl font-black font-mono text-slate-100 tracking-tight mt-1">
+                  {(previousQuarterInfo?.finalRent || 0).toLocaleString()}{" "}
+                  <span className="text-sm font-bold text-slate-400 font-sans">원/㎡/월</span>
+                </div>
+              </div>
+
+              {/* QoQ Variation Pill */}
+              {previousQuarterInfo && (
+                (() => {
+                  const diff = calculatedFinalRent - previousQuarterInfo.finalRent;
+                  const percent = previousQuarterInfo.finalRent > 0
+                    ? ((diff / previousQuarterInfo.finalRent) * 100).toFixed(1)
+                    : "0.0";
+                  const isUp = diff >= 0;
+
+                  return (
+                    <div className="text-xs font-mono font-bold p-2.5 rounded-xl bg-slate-900/90 border border-slate-700 flex items-center justify-between mt-1">
+                      <span className="text-slate-400">전분기 대비 (QoQ):</span>
+                      <span className={`flex items-center gap-1 ${isUp ? "text-emerald-400" : "text-rose-400"}`}>
+                        {isUp ? <TrendingUp className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                        {diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString()} 원 ({isUp ? `+${percent}` : `${percent}`}% {isUp ? "▲" : "▼"})
+                      </span>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
           </div>
-          <p className="leading-relaxed text-indigo-900/90">
-            AI 추천 적정임대기준가격 모델은 크롤링 매물의 단순 <strong>전용면적당 호가</strong>가 아닌, 알스퀘어 지역·권역별 전용률을 적용하여 모든 매물을 <strong>계약면적 환산 단가(원/㎡)</strong>로 정규화한 후 중앙값 벤치마크(<span className="font-mono font-bold">R<sub>기준</sub></span>)로 사용합니다.
-          </p>
-          <div className="text-[11px] text-indigo-700 font-mono bg-white/80 p-2 rounded-lg border border-indigo-100 mt-1 inline-block">
-            공식: 계약면적 환산 단가 = 전용면적당 호가 × (전용면적 ÷ 계약면적) = 전용단가 × 전용률
+
+          {/* Subdued Reference Note for Contract Area Conversion */}
+          <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs text-slate-300">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-indigo-300 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800">
+                산정 기초 정보
+              </span>
+              <span>
+                {calculationResult.region} 지역대표 계약면적 환산 단가 ($R_{`기준`}$): <strong className="font-mono text-white text-sm">{calculationResult.baseRegionalRent.toLocaleString()}</strong> 원/㎡/월
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden lg:inline">
+              * 알스퀘어 전용률을 적용하여 매물 호가를 계약면적 단가로 정규화한 중앙값입니다.
+            </span>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Calculation Grid */}
       {calculationResult && (
@@ -569,7 +661,7 @@ export function BuildingCalculationView({
                     1
                   </span>
                   <h3 className="text-sm font-bold text-slate-800">
-                    지역 대표 계약면적 환산 단가 벤치마크 ($R_{`기준`}$)
+                    지역대표 계약면적 환산 단가 ($R_{`기준`}$)
                   </h3>
                 </div>
                 <span className="text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
@@ -1036,15 +1128,15 @@ export function BuildingCalculationView({
 
                 <button
                   onClick={() => {
-                    setAppliedZoneFactor(calculationResult.recommendedFactors.zone);
-                    setAppliedSizeFactor(calculationResult.recommendedFactors.size);
-                    setAppliedAgeFactor(calculationResult.recommendedFactors.age);
-                    setAdjustmentReason("추천 보정계수 원안 수용");
+                    setAppliedZoneFactor(calculationResult.observedFactors.zone);
+                    setAppliedSizeFactor(calculationResult.observedFactors.size);
+                    setAppliedAgeFactor(calculationResult.observedFactors.age);
+                    setAdjustmentReason("추천(관측) 보정계수 원안 수용");
                   }}
                   className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg transition"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  추천 보정계수 초기화
+                  추천(관측) 보정계수 초기화
                 </button>
               </div>
 
@@ -1157,6 +1249,62 @@ export function BuildingCalculationView({
                     <span>2.000 (+100%)</span>
                   </div>
                 </div>
+
+                {/* Our Building Contract Rent & Conversion Factor (Right below Age Slider) */}
+                {(() => {
+                  const prevBaselineRent = previousQuarterInfo?.finalRent || 14000;
+                  const { factor, percentage } = calculateConversionFactor(
+                    actualContractRentInput,
+                    prevBaselineRent
+                  );
+
+                  return (
+                    <div className="space-y-2 bg-gradient-to-br from-indigo-50 via-purple-50/50 to-indigo-50 p-3.5 rounded-xl border border-indigo-200/90 shadow-2xs">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                          전분기 우리매물 실계약단가
+                        </span>
+                        <span className="text-[10px] font-mono text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded font-bold">
+                          변환계수 ($C_{`변환`}$) 산출
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <div className="text-[11px] text-slate-600 font-mono">
+                          <span>계약단가 입력:</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={actualContractRentInput}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setActualContractRentInput(val);
+                              saveActualContractRent(selectedBuildingId, val);
+                            }}
+                            className="w-28 px-2 py-1 text-right font-mono font-extrabold text-indigo-900 bg-white border border-indigo-300 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 shadow-2xs"
+                          />
+                          <span className="text-[11px] font-bold text-slate-600">원/㎡</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1.5 border-t border-indigo-200/70 text-xs">
+                        <span className="font-bold text-slate-700">
+                          임대가격 변환계수 ($C_{`변환`}$):
+                        </span>
+                        <div className="text-right">
+                          <span className="bg-indigo-600 text-white font-mono font-black text-xs px-2.5 py-0.5 rounded-lg shadow-2xs">
+                            {factor.toFixed(3)} <span className="text-[10px] text-indigo-200 font-normal">({percentage})</span>
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono text-right">
+                        산식: 전분기 임대기준가 ({prevBaselineRent.toLocaleString()}원) ÷ 전분기 실계약단가 ({actualContractRentInput.toLocaleString()}원)
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Combined Factor Comparison Box */}
                 <div className="bg-slate-900 text-white p-4 rounded-xl space-y-2">

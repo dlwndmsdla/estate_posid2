@@ -75,17 +75,29 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
     const zDiff = Math.abs(adjConfig.zone.appliedFactor - adjConfig.zone.recommendedFactor) > 0.0001;
     const sDiff = Math.abs(adjConfig.size.appliedFactor - adjConfig.size.recommendedFactor) > 0.0001;
     const aDiff = Math.abs(adjConfig.age.appliedFactor - adjConfig.age.recommendedFactor) > 0.0001;
-    return zDiff || sDiff || aDiff;
+    const mDiff = adjConfig.marketPolicy
+      ? Math.abs(adjConfig.marketPolicy.appliedFactor - adjConfig.marketPolicy.recommendedFactor) > 0.0001
+      : false;
+    return zDiff || sDiff || aDiff || mDiff;
   }, [adjConfig]);
 
   // Handle factor slider / input change
-  const handleFactorChange = (key: "zone" | "size" | "age", val: number) => {
+  const handleFactorChange = (key: "zone" | "size" | "age" | "marketPolicy", val: number) => {
     // Clamp between 0.500 and 2.000
     const clamped = Math.max(0.500, Math.min(2.000, parseFloat(val.toFixed(3))));
     setAdjConfig((prev) => ({
       ...prev,
       [key]: {
-        ...prev[key],
+        ...(prev[key] || {
+          observedFactor: 1.000,
+          recommendedFactor: 1.000,
+          appliedFactor: 1.000,
+          sampleCount: 1,
+          confidenceLow: 0.900,
+          confidenceHigh: 1.100,
+          reliability: "높음",
+          reason: "시장 및 공실률 보정",
+        }),
         appliedFactor: clamped,
       },
     }));
@@ -99,6 +111,18 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
       zone: { ...prev.zone, appliedFactor: prev.zone.recommendedFactor },
       size: { ...prev.size, appliedFactor: prev.size.recommendedFactor },
       age: { ...prev.age, appliedFactor: prev.age.recommendedFactor },
+      marketPolicy: prev.marketPolicy
+        ? { ...prev.marketPolicy, appliedFactor: prev.marketPolicy.recommendedFactor }
+        : {
+            observedFactor: 1.000,
+            recommendedFactor: 1.000,
+            appliedFactor: 1.000,
+            sampleCount: 1,
+            confidenceLow: 0.900,
+            confidenceHigh: 1.100,
+            reliability: "높음",
+            reason: "시장 및 공실률 보정",
+          },
       adjustmentReason: "",
     }));
     setIsSaved(false);
@@ -111,6 +135,19 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
       zone: { ...prev.zone, appliedFactor: 1.000 },
       size: { ...prev.size, appliedFactor: 1.000 },
       age: { ...prev.age, appliedFactor: 1.000 },
+      marketPolicy: prev.marketPolicy
+        ? { ...prev.marketPolicy, appliedFactor: 1.000 }
+        : {
+            observedFactor: 1.000,
+            recommendedFactor: 1.000,
+            appliedFactor: 1.000,
+            sampleCount: 1,
+            confidenceLow: 0.900,
+            confidenceHigh: 1.100,
+            reliability: "높음",
+            reason: "시장 및 공실률 보정",
+          },
+      adjustmentReason: "",
     }));
     setIsSaved(false);
   };
@@ -429,8 +466,8 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
           </div>
         </div>
 
-        {/* 3 Factor Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* 4 Factor Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           
           {/* Card 1: Zone Factor */}
           <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4 hover:border-indigo-200 transition">
@@ -463,7 +500,7 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
             {/* Slider & Input control */}
             <div className="space-y-2 bg-white p-3 rounded-xl border border-slate-200">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-semibold">담당자 적용계수 수동입력</span>
+                <span className="text-slate-600 font-semibold">담당자 적용계수</span>
                 <div className="flex items-center gap-1">
                   <input
                     type="number"
@@ -486,9 +523,9 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
                 className="w-full accent-purple-600 h-1.5 bg-slate-100 rounded-lg cursor-pointer"
               />
               <div className="flex justify-between text-[9px] text-slate-400 font-mono">
-                <span>0.500 (-50%)</span>
-                <span>1.000 (기준)</span>
-                <span>2.000 (+100%)</span>
+                <span>0.500</span>
+                <span>1.000</span>
+                <span>2.000</span>
               </div>
             </div>
 
@@ -550,7 +587,7 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
             {/* Slider & Input control */}
             <div className="space-y-2 bg-white p-3 rounded-xl border border-slate-200">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-semibold">담당자 적용계수 수동입력</span>
+                <span className="text-slate-600 font-semibold">담당자 적용계수</span>
                 <div className="flex items-center gap-1">
                   <input
                     type="number"
@@ -573,9 +610,9 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
                 className="w-full accent-purple-600 h-1.5 bg-slate-100 rounded-lg cursor-pointer"
               />
               <div className="flex justify-between text-[9px] text-slate-400 font-mono">
-                <span>0.500 (-50%)</span>
-                <span>1.000 (기준)</span>
-                <span>2.000 (+100%)</span>
+                <span>0.500</span>
+                <span>1.000</span>
+                <span>2.000</span>
               </div>
             </div>
 
@@ -637,7 +674,7 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
             {/* Slider & Input control */}
             <div className="space-y-2 bg-white p-3 rounded-xl border border-slate-200">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-semibold">담당자 적용계수 수동입력</span>
+                <span className="text-slate-600 font-semibold">담당자 적용계수</span>
                 <div className="flex items-center gap-1">
                   <input
                     type="number"
@@ -660,9 +697,9 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
                 className="w-full accent-purple-600 h-1.5 bg-slate-100 rounded-lg cursor-pointer"
               />
               <div className="flex justify-between text-[9px] text-slate-400 font-mono">
-                <span>0.500 (-50%)</span>
-                <span>1.000 (기준)</span>
-                <span>2.000 (+100%)</span>
+                <span>0.500</span>
+                <span>1.000</span>
+                <span>2.000</span>
               </div>
             </div>
 
@@ -680,6 +717,93 @@ export const RentEstimator: React.FC<RentEstimatorProps> = ({ building }) => {
                 <span className="text-slate-400">추천 판단 사유:</span>
                 <span className="font-semibold text-indigo-900 truncate max-w-[150px]" title={adjConfig.age.reason}>
                   {adjConfig.age.reason}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowFormulaModal(true)}
+              className="w-full py-1.5 text-xs text-indigo-700 font-bold bg-indigo-50 hover:bg-indigo-100 rounded-xl transition flex items-center justify-center gap-1 border border-indigo-100 cursor-pointer"
+            >
+              <Info className="w-3.5 h-3.5" />
+              산출 근거 보기
+            </button>
+          </div>
+
+          {/* Card 4: Market Policy / Manager Factor */}
+          <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4 hover:border-indigo-200 transition">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+              <div>
+                <span className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider block">Factor 4</span>
+                <h4 className="font-bold text-slate-800 text-sm">④ 담당자/시장상황 반영계수 (K<sub>시장</sub>)</h4>
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full border ${getReliabilityBadge(adjConfig.marketPolicy?.reliability || "높음")}`}>
+                {adjConfig.marketPolicy?.reliability || "높음"}
+              </span>
+            </div>
+
+            {/* Values comparison box */}
+            <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+              <div className="bg-white p-2 rounded-xl border border-slate-200">
+                <span className="text-[9px] text-slate-400 block font-sans">관측값</span>
+                <span className="font-bold text-slate-600">{(adjConfig.marketPolicy?.observedFactor ?? 1.000).toFixed(3)}</span>
+              </div>
+              <div className="bg-blue-50/70 p-2 rounded-xl border border-blue-200">
+                <span className="text-[9px] text-blue-600 font-bold block font-sans">AI 추천값</span>
+                <span className="font-extrabold text-blue-700">{(adjConfig.marketPolicy?.recommendedFactor ?? 1.000).toFixed(3)}</span>
+              </div>
+              <div className="bg-purple-50/70 p-2 rounded-xl border border-purple-200">
+                <span className="text-[9px] text-purple-600 font-bold block font-sans">담당자 적용</span>
+                <span className="font-extrabold text-purple-700">{(adjConfig.marketPolicy?.appliedFactor ?? 1.000).toFixed(3)}</span>
+              </div>
+            </div>
+
+            {/* Slider & Input control */}
+            <div className="space-y-2 bg-white p-3 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-600 font-semibold">담당자 적용계수</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0.500"
+                    max="2.000"
+                    value={adjConfig.marketPolicy?.appliedFactor ?? 1.000}
+                    onChange={(e) => handleFactorChange("marketPolicy", parseFloat(e.target.value) || 1.000)}
+                    className="w-20 px-2 py-1 text-right font-mono font-bold text-purple-700 bg-purple-50/50 border border-purple-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+              <input
+                type="range"
+                min="0.500"
+                max="2.000"
+                step="0.001"
+                value={adjConfig.marketPolicy?.appliedFactor ?? 1.000}
+                onChange={(e) => handleFactorChange("marketPolicy", parseFloat(e.target.value))}
+                className="w-full accent-purple-600 h-1.5 bg-slate-100 rounded-lg cursor-pointer"
+              />
+              <div className="flex justify-between text-[9px] text-slate-400 font-mono">
+                <span>0.500</span>
+                <span>1.000</span>
+                <span>2.000</span>
+              </div>
+            </div>
+
+            {/* Statistics details */}
+            <div className="space-y-1.5 text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200/80">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-400">고려 요소:</span>
+                <span className="font-bold text-slate-700">공실률·상권·정책</span>
+              </div>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-400">95% 신뢰구간 (CI):</span>
+                <span className="font-mono text-slate-700">{(adjConfig.marketPolicy?.confidenceLow ?? 0.9).toFixed(3)} ~ {(adjConfig.marketPolicy?.confidenceHigh ?? 1.1).toFixed(3)}</span>
+              </div>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-400">설명 사유:</span>
+                <span className="font-semibold text-indigo-900 truncate max-w-[150px]" title={adjConfig.marketPolicy?.reason || "시장 상황 반영"}>
+                  {adjConfig.marketPolicy?.reason || "시장 상황 반영"}
                 </span>
               </div>
             </div>

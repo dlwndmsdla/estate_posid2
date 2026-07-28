@@ -72,6 +72,7 @@ export interface BuildingAdjustmentConfig {
   zone: FactorDetail;
   size: FactorDetail;
   age: FactorDetail;
+  marketPolicy?: FactorDetail;   // 시장·공실률/정책 보정계수 (K_시장)
   adjustmentReason?: string;     // 담당자 수기조정 사유
 }
 

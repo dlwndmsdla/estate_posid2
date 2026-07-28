@@ -287,6 +287,13 @@ export interface HallComparisonRow {
   contractRentByOverallWon: number;
   contractRentByRegionWon: number;
   contractRentByZoneWon: number;
+
+  regionExclMedianRentWon: number;
+  regionAppliedRate: number;
   regionListingsMedianRentWon: number;
+
+  zoneExclMedianRentWon: number;
+  zoneAppliedRate: number;
+  isZoneFallback: boolean;
   zoneListingsMedianRentWon: number;
 }

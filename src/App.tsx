@@ -219,18 +219,15 @@ export default function App() {
         {/* Breadcrumbs */}
         <BreadcrumbBar activeMainMenu={activeMainMenu} activeSubMenu={activeSubMenu} />
 
-        {/* Content Layout with Sub-navigation */}
-        <div className={`flex flex-col ${isSidebarLayout ? "lg:flex-row gap-6" : "space-y-4"}`}>
-          {/* Sub Navigation Bar */}
-          <SubNavigation
-            activeMainMenu={activeMainMenu}
-            activeSubMenu={activeSubMenu}
-            onSelectSubMenu={handleSubMenuSelect}
-            layoutType={isSidebarLayout ? "sidebar" : "horizontal"}
-          />
+        {/* Unified Sub Navigation Bar */}
+        <SubNavigation
+          activeMainMenu={activeMainMenu}
+          activeSubMenu={activeSubMenu}
+          onSelectSubMenu={handleSubMenuSelect}
+        />
 
-          {/* Sub-view Content Body */}
-          <div className="flex-1 min-w-0">
+        {/* Sub-view Content Body */}
+        <div className="min-w-0 space-y-4">
             {/* 1. 종합 현황 (overview) */}
             {activeMainMenu === "overview" && (
               <>
@@ -319,7 +316,6 @@ export default function App() {
               </>
             )}
           </div>
-        </div>
       </main>
     </div>
   );

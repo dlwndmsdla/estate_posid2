@@ -31,9 +31,9 @@ export const activeBuildingsInfo = [
     city: "당산",
     tradeArea: "영등포·당산 상권",
     address: "서울특별시 영등포구 선유동2로 6",
-    builtYear: 1999,
-    grossAreaSqm: 23150, // 중형
-    efficiencyRate: 58.0,
+    builtYear: 2021,
+    grossAreaSqm: 23573.93, // 중형
+    efficiencyRate: 48.87,
     useType: "업무시설",
     coordinates: { x: 34, y: 32 },
   },
@@ -43,9 +43,9 @@ export const activeBuildingsInfo = [
     city: "영등포",
     tradeArea: "영등포역 상권",
     address: "서울특별시 영등포구 영등포동4가 425-2",
-    builtYear: 2004,
-    grossAreaSqm: 28900, // 중형
-    efficiencyRate: 59.5,
+    builtYear: 1988,
+    grossAreaSqm: 14476.76, // 중형
+    efficiencyRate: 51.67,
     useType: "업무시설",
     coordinates: { x: 38, y: 35 },
   },
@@ -55,9 +55,9 @@ export const activeBuildingsInfo = [
     city: "부산",
     tradeArea: "부산 중구 상권",
     address: "부산광역시 중구 중앙대로 63",
-    builtYear: 2011,
-    grossAreaSqm: 38500, // 대형
-    efficiencyRate: 62.0,
+    builtYear: 1989,
+    grossAreaSqm: 33148.77, // 대형
+    efficiencyRate: 60.0,
     useType: "업무시설",
     coordinates: { x: 74, y: 83 },
   },
@@ -68,8 +68,8 @@ export const activeBuildingsInfo = [
     tradeArea: "대구 남구 상권",
     address: "대구광역시 남구 명덕로 104",
     builtYear: 2003,
-    grossAreaSqm: 24700, // 중형
-    efficiencyRate: 57.5,
+    grossAreaSqm: 22894.63, // 중형
+    efficiencyRate: 41.0,
     useType: "업무시설",
     coordinates: { x: 62, y: 64 },
   },
@@ -79,9 +79,9 @@ export const activeBuildingsInfo = [
     city: "광주",
     tradeArea: "광주 서구 상권",
     address: "광주광역시 서구 상무중앙로 110",
-    builtYear: 2004,
-    grossAreaSqm: 22400, // 중형
-    efficiencyRate: 56.8,
+    builtYear: 2008,
+    grossAreaSqm: 24200, // 중형
+    efficiencyRate: 53.2,
     useType: "업무시설",
     coordinates: { x: 32, y: 72 },
   },
