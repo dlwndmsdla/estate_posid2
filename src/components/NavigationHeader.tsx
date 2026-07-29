@@ -111,43 +111,43 @@ export function NavigationHeader({
         </div>
       </div>
 
-      {/* Primary Top Main Categories Navigation Bar (4 Category Tabs) - Desktop */}
+      {/* Primary Top Main Categories Navigation Bar (4 Step Tabs + Ref) - Desktop */}
       <nav className="bg-slate-950 border-t border-slate-800 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between">
-          <div className="flex gap-1.5 py-1.5">
-            {mainNavigation.map((item, idx) => {
+          <div className="flex items-center gap-1.5 py-1.5">
+            {mainNavigation.map((item) => {
               const Icon = item.icon;
               const isActive = activeMainMenu === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => onSelectMenu(item.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all relative ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all relative ${
                     isActive
-                      ? "bg-indigo-600 text-white shadow-md border border-indigo-400/40"
+                      ? "bg-indigo-600 text-white shadow-md border border-indigo-400/50 ring-1 ring-indigo-400/30"
                       : "text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent"
                   }`}
                 >
-                  <span className="text-[10px] text-slate-400 font-mono">{idx + 1}.</span>
-                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-indigo-400"}`} />
+                  {item.stepNumber ? (
+                    <span
+                      className={`w-5 h-5 rounded-full flex items-center justify-center font-mono text-[10px] font-black ${
+                        isActive ? "bg-white text-indigo-700" : "bg-slate-800 text-slate-300 border border-slate-700"
+                      }`}
+                    >
+                      {item.stepNumber}
+                    </span>
+                  ) : (
+                    <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-indigo-400"}`} />
+                  )}
                   <span>{item.label}</span>
-                  <span
-                    className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
-                      isActive
-                        ? "bg-white/20 text-white"
-                        : "bg-slate-800 text-slate-400"
-                    }`}
-                  >
-                    {item.children.length}
-                  </span>
                 </button>
               );
             })}
           </div>
 
-          <div className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5">
+          <div className="text-[11px] text-slate-400 font-medium flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
-            <span>현재 메뉴: <strong className="text-white font-bold">{currentMainObj.label}</strong></span>
+            <span>분기 작업 진행 중: <strong className="text-white font-bold">{currentMainObj.label}</strong></span>
           </div>
         </div>
       </nav>
@@ -157,26 +157,33 @@ export function NavigationHeader({
         <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center gap-2 overflow-x-auto scrollbar-none">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
             <Layers className="w-3 h-3 text-indigo-400" />
-            {currentMainObj.label} 세부항목:
+            {currentMainObj.label}:
           </span>
 
           <div className="flex items-center gap-1.5">
-            {currentMainObj.children.map((sub) => {
+            {currentMainObj.children.map((sub, idx) => {
               const isSubActive = activeSubMenu === sub.id;
+              const isFirstInGroup = sub.group && (idx === 0 || currentMainObj.children[idx - 1]?.group !== sub.group);
               return (
-                <button
-                  key={sub.id}
-                  onClick={() => onSelectMenu(activeMainMenu, sub.id)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                    isSubActive
-                      ? "bg-indigo-500 text-white shadow-sm ring-2 ring-indigo-400/50"
-                      : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60"
-                  }`}
-                  title={sub.description}
-                >
-                  <span>{sub.label}</span>
-                  {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />}
-                </button>
+                <React.Fragment key={sub.id}>
+                  {isFirstInGroup && (
+                    <span className="text-[10px] font-extrabold text-indigo-300 bg-indigo-900/60 px-2 py-0.5 rounded border border-indigo-700/50 shrink-0 ml-1">
+                      {sub.group}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => onSelectMenu(activeMainMenu, sub.id)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                      isSubActive
+                        ? "bg-indigo-500 text-white shadow-sm ring-2 ring-indigo-400/50"
+                        : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60"
+                    }`}
+                    title={sub.description}
+                  >
+                    <span>{sub.label}</span>
+                    {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />}
+                  </button>
+                </React.Fragment>
               );
             })}
           </div>

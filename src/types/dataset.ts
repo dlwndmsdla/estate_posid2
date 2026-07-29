@@ -165,9 +165,9 @@ export interface CalculationResult {
   zone: string;
   baseRegionalRent: number;      // R_기준 (원/㎡)
   currentContractRent: number;   // R_현재 (원/㎡)
-  observedFactors: { zone: number; size: number; age: number; total: number };
-  recommendedFactors: { zone: number; size: number; age: number; total: number };
-  appliedFactors: { zone: number; size: number; age: number; total: number };
+  observedFactors: { zone: number; size: number; age: number; marketPolicy?: number; total: number };
+  recommendedFactors: { zone: number; size: number; age: number; marketPolicy?: number; total: number };
+  appliedFactors: { zone: number; size: number; age: number; marketPolicy?: number; total: number };
   zoneFactorDetail: FactorDetail;
   sizeFactorDetail: FactorDetail;
   ageFactorDetail: FactorDetail;
@@ -187,16 +187,19 @@ export interface ConfirmedValuation {
     zone: number;
     size: number;
     age: number;
+    marketPolicy?: number;
   };
   recommendedFactors: {
     zone: number;
     size: number;
     age: number;
+    marketPolicy?: number;
   };
   appliedFactors: {
     zone: number;
     size: number;
     age: number;
+    marketPolicy?: number;
   };
   observedTotalFactor: number;
   recommendedTotalFactor: number;

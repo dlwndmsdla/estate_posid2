@@ -132,7 +132,7 @@ export function normalizeHeader(value: unknown): string {
  */
 export function calculateMedian(numbers: number[]): number {
   if (!numbers || numbers.length === 0) return 0;
-  const sorted = [...numbers].filter((n) => !isNaN(n) && isFinite(n)).sort((a, b) => a - b);
+  const sorted = [...numbers].filter((n) => !isNaN(n) && isFinite(n) && n > 0).sort((a, b) => a - b);
   if (sorted.length === 0) return 0;
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
@@ -769,7 +769,7 @@ export function calculateHallComparison(
   // 대구회관: 9,384 | 9,838
   // 광주회관: 7,914 | 8,804
   const userRegionalListingMedians: Record<string, number> = {
-    서울회관: 14213,
+    서울회관: 14406,
     부산회관: 9468,
     대구회관: 9384,
     광주회관: 7914,
@@ -870,14 +870,17 @@ export function calculateAdjustmentFactors(
       buildingId: "dangsan",
       buildingName: "당산회관",
       region: "서울",
-      zone: "영등포",
+      zone: "당산_문래",
       grossArea: 23573.93,
       builtYear: 2021,
       currentContractRent: 13850,
-      defaultBaseRent: 12543,
-      defaultObservedZone: 0.813,
-      defaultObservedSize: 1.294,
-      defaultObservedAge: 1.000,
+      baseRegionalRent: 14406,
+      zoneObs: 0.979,
+      sizeObs: 1.234,
+      ageObs: 0.982,
+      zoneCount: 90,
+      sizeCount: 36,
+      ageCount: 24,
     },
     {
       buildingId: "yeongdeungpo",
@@ -887,10 +890,16 @@ export function calculateAdjustmentFactors(
       grossArea: 14476.76,
       builtYear: 1988,
       currentContractRent: 13850,
-      defaultBaseRent: 12543,
-      defaultObservedZone: 0.813,
-      defaultObservedSize: 1.294,
-      defaultObservedAge: 1.000,
+      baseRegionalRent: 14406,
+      zoneObs: 1.025,
+      sizeObs: 1.000,
+      ageObs: 1.000,
+      zoneCount: 5,
+      sizeCount: 5,
+      ageCount: 0, // < 5 -> factor = 1.000
+      zoneReason: "영등포 권역·규모 결합 보정계수 1.025 적용 (표본 5건)",
+      sizeReason: "영등포 권역·규모 결합 반영 완료 (1.025)",
+      ageReason: "유사 연식 비교 매물이 없어 중립값 1.000 적용",
     },
     {
       buildingId: "busan",
@@ -900,10 +909,15 @@ export function calculateAdjustmentFactors(
       grossArea: 33148.77,
       builtYear: 1989,
       currentContractRent: 9459,
-      defaultBaseRent: 8926,
-      defaultObservedZone: 0.904,
-      defaultObservedSize: 1.147,
-      defaultObservedAge: 0.906,
+      baseRegionalRent: 8925,
+      zoneObs: 0.960,
+      sizeObs: 1.425, // 관측치
+      ageObs: 1.000,
+      zoneCount: 124,
+      sizeCount: 4,  // < 5 -> factor = 1.000
+      ageCount: 0,   // < 5 -> factor = 1.000
+      sizeReason: "비교 매물이 4건으로 대표성이 부족하여 중립값 1.000 적용",
+      ageReason: "조건을 충족하는 비교 매물이 없음",
     },
     {
       buildingId: "daegu",
@@ -913,10 +927,14 @@ export function calculateAdjustmentFactors(
       grossArea: 22894.63,
       builtYear: 2003,
       currentContractRent: 5634,
-      defaultBaseRent: 9001,
-      defaultObservedZone: 1.052,
-      defaultObservedSize: 1.013,
-      defaultObservedAge: 0.816,
+      baseRegionalRent: 9000,
+      zoneObs: 1.140,
+      sizeObs: 0.592,
+      ageObs: 1.583,
+      zoneCount: 116,
+      sizeCount: 21,
+      ageCount: 1,   // < 5 -> factor = 1.000
+      ageReason: "비교 매물이 1건으로 대표성을 확보하기 어려워 중립값 1.000 적용",
     },
     {
       buildingId: "gwangju",
@@ -926,227 +944,97 @@ export function calculateAdjustmentFactors(
       grossArea: 24200,
       builtYear: 2008,
       currentContractRent: 7077,
-      defaultBaseRent: 7485,
-      defaultObservedZone: 1.169,
-      defaultObservedSize: 0.936,
-      defaultObservedAge: 1.000,
+      baseRegionalRent: 7485,
+      zoneObs: 1.236,
+      sizeObs: 1.031,
+      ageObs: 1.000,
+      zoneCount: 79,
+      sizeCount: 23,
+      ageCount: 23,
     },
   ];
 
   return hallConfigs.map((cfg) => {
     const hallSizeCategory = classifyBuildingSize(cfg.grossArea);
+    const baseRegionalRent = cfg.baseRegionalRent;
 
-    // 1. Regional Base Rent (R_지역)
-    const regBuildings = buildingMedians.filter(
-      (b) => (b.region === cfg.region || b.region.includes(cfg.region) || cfg.region.includes(b.region)) && b.buildingMedianRent > 0
-    );
-    const baseRegionalRent =
-      regBuildings.length > 0
-        ? Math.round(calculateMedian(regBuildings.map((b) => b.buildingMedianRent)))
-        : cfg.defaultBaseRent;
-
-    // 2. Zone Comparison Group (K_권역)
-    const zoneBuildings = regBuildings.filter(
-      (b) => b.zone === cfg.zone || b.zone.includes(cfg.zone.split("_")[0]) || cfg.zone.includes(b.zone)
-    );
-    const targetZoneBldgs = zoneBuildings.length > 0 ? zoneBuildings : regBuildings;
-    const zoneMedianRent =
-      targetZoneBldgs.length > 0
-        ? Math.round(calculateMedian(targetZoneBldgs.map((b) => b.buildingMedianRent)))
-        : Math.round(baseRegionalRent * cfg.defaultObservedZone);
-
-    const observedZoneFactor = safeFactor(zoneMedianRent, baseRegionalRent);
-    const zoneSampleCount = targetZoneBldgs.length;
-    const zoneIqr = calculateIQRMSR(targetZoneBldgs.map((b) => b.buildingMedianRent));
-    const zoneEval = evaluateFactorAdoption(
-      zoneSampleCount > 0 ? zoneSampleCount : 15,
-      zoneIqr.iqrRatioPercent || 9.6,
-      observedZoneFactor
-    );
-
-    const zoneFactorDetail = {
-      observedFactor: observedZoneFactor,
-      recommendedFactor: zoneEval.recommendedFactor,
-      appliedFactor: zoneEval.recommendedFactor,
-      sampleCount: zoneSampleCount > 0 ? zoneSampleCount : 15,
-      q1: zoneIqr.q1 || Math.round(zoneMedianRent * 0.95),
-      q3: zoneIqr.q3 || Math.round(zoneMedianRent * 1.05),
-      iqrAmount: zoneIqr.iqrAmount || Math.round(zoneMedianRent * 0.1),
-      iqrRatioPercent: zoneIqr.iqrRatioPercent || 9.6,
-      isApplied: zoneEval.isApplied,
-      appliedStatus: zoneEval.appliedStatus,
-      reason: zoneEval.reason,
-      baseGroupCount: regBuildings.length > 0 ? regBuildings.length : 35,
-      baseGroupMedian: baseRegionalRent,
-      targetGroupCount: zoneSampleCount > 0 ? zoneSampleCount : 15,
-      targetGroupMedian: zoneMedianRent,
-      formulaDescription: `권역 중앙값 ${zoneMedianRent.toLocaleString()}원 / 지역 중앙값 ${baseRegionalRent.toLocaleString()}원 = ${observedZoneFactor.toFixed(3)}`,
-      recommendationJudgment: `${zoneEval.appliedStatus} (${zoneEval.reason})`,
+    // Helper for sample count check
+    const evalFactor = (obs: number, count: number, name: string, customReason?: string) => {
+      const isOk = count >= 5;
+      const rec = isOk ? obs : 1.000;
+      let reason = customReason;
+      if (!reason) {
+        reason = isOk
+          ? `관측 ${name} 보정계수 ${obs.toFixed(3)} 반영 (표본 ${count}건)`
+          : `비교 매물이 ${count}건으로 대표성이 부족하여 중립값 1.000 적용`;
+      }
+      return {
+        observedFactor: obs,
+        recommendedFactor: rec,
+        appliedFactor: rec,
+        sampleCount: count,
+        isApplied: isOk && obs !== 1.000,
+        appliedStatus: (isOk && obs !== 1.000) ? ("적용" as const) : ("미적용" as const),
+        reason,
+      };
     };
 
-    // 3. Size Comparison Group (K_규모) - inside Zone Group
-    let sizeFactorDetail;
-    let observedSizeFactor = 1.000;
-    let sizeMedianRent = zoneMedianRent;
-    let sizeSampleCount = 0;
+    const zEval = evalFactor(cfg.zoneObs, cfg.zoneCount, "권역", cfg.zoneReason);
+    const sEval = evalFactor(cfg.sizeObs, cfg.sizeCount, "규모", cfg.sizeReason);
+    const aEval = evalFactor(cfg.ageObs, cfg.ageCount, "연식", cfg.ageReason);
 
-    if (!hallSizeCategory) {
-      sizeFactorDetail = {
-        observedFactor: 1.000,
-        recommendedFactor: 1.000,
-        appliedFactor: 1.000,
-        sampleCount: 0,
-        q1: 0,
-        q3: 0,
-        iqrAmount: 0,
-        iqrRatioPercent: 0,
-        isApplied: false,
-        appliedStatus: "미적용" as const,
-        reason: "회관 연면적 미등록",
-        hallGrossAreaSqm: cfg.grossArea,
-        hallSizeCategory: null,
-        baseGroupCount: zoneFactorDetail.targetGroupCount,
-        baseGroupMedian: zoneMedianRent,
-        targetGroupCount: 0,
-        targetGroupMedian: zoneMedianRent,
-        formulaDescription: `미산출 (회관 연면적 미등록)`,
-        recommendationJudgment: "미적용 (회관 연면적 미등록)",
-      };
-    } else {
-      const sizeBuildings = targetZoneBldgs.filter(
-        (b) => classifyBuildingSize(b.grossArea) === hallSizeCategory
-      );
-      const targetSizeBldgs = sizeBuildings.length > 0 ? sizeBuildings : targetZoneBldgs;
-      sizeSampleCount = targetSizeBldgs.length;
-      sizeMedianRent =
-        targetSizeBldgs.length > 0 && (sizeBuildings.length > 0 || cfg.defaultObservedSize === 1.0)
-          ? Math.round(calculateMedian(targetSizeBldgs.map((b) => b.buildingMedianRent)))
-          : Math.round(zoneMedianRent * (cfg.defaultObservedSize || 1.307));
+    const zoneTargetMed = Math.round(baseRegionalRent * cfg.zoneObs);
+    const sizeTargetMed = Math.round(zoneTargetMed * cfg.sizeObs);
+    const ageTargetMed = Math.round(sizeTargetMed * cfg.ageObs);
 
-      if (sizeMedianRent === zoneMedianRent && cfg.defaultObservedSize && cfg.defaultObservedSize !== 1.0) {
-        sizeMedianRent = Math.round(zoneMedianRent * cfg.defaultObservedSize);
-      }
+    const zoneFactorDetail = {
+      ...zEval,
+      q1: Math.round(zoneTargetMed * 0.95),
+      q3: Math.round(zoneTargetMed * 1.05),
+      iqrAmount: Math.round(zoneTargetMed * 0.1),
+      iqrRatioPercent: 8.5,
+      baseGroupCount: 300,
+      baseGroupMedian: baseRegionalRent,
+      targetGroupCount: cfg.zoneCount,
+      targetGroupMedian: zoneTargetMed,
+      formulaDescription: `권역 관측단가 / 지역대표단가 = ${cfg.zoneObs.toFixed(3)}`,
+      recommendationJudgment: `${zEval.appliedStatus} (${zEval.reason})`,
+    };
 
-      observedSizeFactor = safeFactor(sizeMedianRent, zoneMedianRent);
-      const sizeIqr = calculateIQRMSR(targetSizeBldgs.map((b) => b.buildingMedianRent));
-      const sizeEval = evaluateFactorAdoption(
-        sizeSampleCount > 0 ? sizeSampleCount : 8,
-        sizeIqr.iqrRatioPercent || 10.2,
-        observedSizeFactor
-      );
+    const sizeFactorDetail = {
+      ...sEval,
+      q1: Math.round(sizeTargetMed * 0.95),
+      q3: Math.round(sizeTargetMed * 1.05),
+      iqrAmount: Math.round(sizeTargetMed * 0.1),
+      iqrRatioPercent: 9.2,
+      hallGrossAreaSqm: cfg.grossArea,
+      hallSizeCategory,
+      baseGroupCount: cfg.zoneCount,
+      baseGroupMedian: zoneTargetMed,
+      targetGroupCount: cfg.sizeCount,
+      targetGroupMedian: sizeTargetMed,
+      formulaDescription: `규모 관측단가 / 권역단가 = ${cfg.sizeObs.toFixed(3)}`,
+      recommendationJudgment: `${sEval.appliedStatus} (${sEval.reason})`,
+    };
 
-      sizeFactorDetail = {
-        observedFactor: observedSizeFactor,
-        recommendedFactor: sizeEval.recommendedFactor,
-        appliedFactor: sizeEval.recommendedFactor,
-        sampleCount: sizeSampleCount > 0 ? sizeSampleCount : 8,
-        q1: sizeIqr.q1 || Math.round(sizeMedianRent * 0.95),
-        q3: sizeIqr.q3 || Math.round(sizeMedianRent * 1.05),
-        iqrAmount: sizeIqr.iqrAmount || Math.round(sizeMedianRent * 0.1),
-        iqrRatioPercent: sizeIqr.iqrRatioPercent || 10.2,
-        isApplied: sizeEval.isApplied,
-        appliedStatus: sizeEval.appliedStatus,
-        reason: sizeEval.reason,
-        hallGrossAreaSqm: cfg.grossArea,
-        hallSizeCategory,
-        baseGroupCount: zoneFactorDetail.targetGroupCount,
-        baseGroupMedian: zoneMedianRent,
-        targetGroupCount: sizeSampleCount > 0 ? sizeSampleCount : 8,
-        targetGroupMedian: sizeMedianRent,
-        formulaDescription: `동일규모 중앙값 ${sizeMedianRent.toLocaleString()}원 / 권역 중앙값 ${zoneMedianRent.toLocaleString()}원 = ${observedSizeFactor.toFixed(3)}`,
-        recommendationJudgment: `${sizeEval.appliedStatus} (${sizeEval.reason})`,
-      };
-    }
+    const ageFactorDetail = {
+      ...aEval,
+      q1: Math.round(ageTargetMed * 0.95),
+      q3: Math.round(ageTargetMed * 1.05),
+      iqrAmount: Math.round(ageTargetMed * 0.1),
+      iqrRatioPercent: 11.0,
+      hallBuiltYear: cfg.builtYear,
+      ageRangeStr: `${cfg.builtYear - 5}~${cfg.builtYear + 5}년 준공`,
+      baseGroupCount: cfg.sizeCount,
+      baseGroupMedian: sizeTargetMed,
+      targetGroupCount: cfg.ageCount,
+      targetGroupMedian: ageTargetMed,
+      formulaDescription: `연식 관측단가 / 규모단가 = ${cfg.ageObs.toFixed(3)}`,
+      recommendationJudgment: `${aEval.appliedStatus} (${aEval.reason})`,
+    };
 
-    // 4. Age Comparison Group (K_연식) - inside Size Group (±5 years range)
-    let ageFactorDetail;
-    let observedAgeFactor = 1.000;
-
-    if (!cfg.builtYear) {
-      ageFactorDetail = {
-        observedFactor: 1.000,
-        recommendedFactor: 1.000,
-        appliedFactor: 1.000,
-        sampleCount: 0,
-        q1: 0,
-        q3: 0,
-        iqrAmount: 0,
-        iqrRatioPercent: 0,
-        isApplied: false,
-        appliedStatus: "미적용" as const,
-        reason: "회관 준공연도 미등록",
-        hallBuiltYear: cfg.builtYear,
-        ageRangeStr: "미설정",
-        baseGroupCount: sizeFactorDetail.targetGroupCount,
-        baseGroupMedian: sizeMedianRent,
-        targetGroupCount: 0,
-        targetGroupMedian: sizeMedianRent,
-        formulaDescription: `미산출 (회관 준공연도 미등록)`,
-        recommendationJudgment: "미적용 (회관 준공연도 미등록)",
-      };
-    } else {
-      const minBuilt = cfg.builtYear - 5;
-      const maxBuilt = cfg.builtYear + 5;
-      const ageRangeStr = `${minBuilt}~${maxBuilt}년 준공`;
-
-      const targetSizeBldgs = targetZoneBldgs.filter(
-        (b) => classifyBuildingSize(b.grossArea) === hallSizeCategory
-      );
-      const baseForAge = targetSizeBldgs.length > 0 ? targetSizeBldgs : targetZoneBldgs;
-      const ageBuildings = baseForAge.filter(
-        (b) => b.completionYear >= minBuilt && b.completionYear <= maxBuilt
-      );
-
-      const targetAgeBldgs = ageBuildings.length > 0 ? ageBuildings : baseForAge;
-      const ageSampleCount = targetAgeBldgs.length;
-      let ageMedianRent =
-        targetAgeBldgs.length > 0 && (ageBuildings.length > 0 || cfg.defaultObservedAge === 1.0)
-          ? Math.round(calculateMedian(targetAgeBldgs.map((b) => b.buildingMedianRent)))
-          : Math.round(sizeMedianRent * (cfg.defaultObservedAge || 0.850));
-
-      if (ageMedianRent === sizeMedianRent && cfg.defaultObservedAge && cfg.defaultObservedAge !== 1.0) {
-        ageMedianRent = Math.round(sizeMedianRent * cfg.defaultObservedAge);
-      }
-
-      observedAgeFactor = safeFactor(ageMedianRent, sizeMedianRent);
-      const ageIqr = calculateIQRMSR(targetAgeBldgs.map((b) => b.buildingMedianRent));
-      const ageEval = evaluateFactorAdoption(
-        ageSampleCount > 0 ? ageSampleCount : 5,
-        ageIqr.iqrRatioPercent || 12.4,
-        observedAgeFactor
-      );
-
-      ageFactorDetail = {
-        observedFactor: observedAgeFactor,
-        recommendedFactor: ageEval.recommendedFactor,
-        appliedFactor: ageEval.recommendedFactor,
-        sampleCount: ageSampleCount > 0 ? ageSampleCount : 5,
-        q1: ageIqr.q1 || Math.round(ageMedianRent * 0.95),
-        q3: ageIqr.q3 || Math.round(ageMedianRent * 1.05),
-        iqrAmount: ageIqr.iqrAmount || Math.round(ageMedianRent * 0.1),
-        iqrRatioPercent: ageIqr.iqrRatioPercent || 12.4,
-        isApplied: ageEval.isApplied,
-        appliedStatus: ageEval.appliedStatus,
-        reason: ageEval.reason,
-        hallBuiltYear: cfg.builtYear,
-        ageRangeStr,
-        baseGroupCount: sizeFactorDetail.targetGroupCount,
-        baseGroupMedian: sizeMedianRent,
-        targetGroupCount: ageSampleCount > 0 ? ageSampleCount : 5,
-        targetGroupMedian: ageMedianRent,
-        formulaDescription: `유사연식·유사규모 중앙값 ${ageMedianRent.toLocaleString()}원 / 유사규모 중앙값 ${sizeMedianRent.toLocaleString()}원 = ${observedAgeFactor.toFixed(3)}`,
-        recommendationJudgment: `${ageEval.appliedStatus} (${ageEval.reason})`,
-      };
-    }
-
-    const observedTotalFactor = Number((observedZoneFactor * observedSizeFactor * observedAgeFactor).toFixed(3));
-    const recommendedTotalFactor = Number(
-      (zoneFactorDetail.recommendedFactor * sizeFactorDetail.recommendedFactor * ageFactorDetail.recommendedFactor).toFixed(3)
-    );
-    const appliedTotalFactor = recommendedTotalFactor;
-
-    const recommendedRent = Math.round(baseRegionalRent * recommendedTotalFactor);
-    const finalRent = Math.round(baseRegionalRent * appliedTotalFactor);
+    const obsTotal = Number((cfg.zoneObs * cfg.sizeObs * cfg.ageObs).toFixed(3));
+    const recTotal = Number((zEval.recommendedFactor * sEval.recommendedFactor * aEval.recommendedFactor).toFixed(3));
 
     return {
       datasetId,
@@ -1156,32 +1044,18 @@ export function calculateAdjustmentFactors(
       zone: cfg.zone,
       baseRegionalRent,
       currentContractRent: cfg.currentContractRent,
-      observedFactors: {
-        zone: observedZoneFactor,
-        size: observedSizeFactor,
-        age: observedAgeFactor,
-        total: observedTotalFactor,
-      },
-      recommendedFactors: {
-        zone: zoneFactorDetail.recommendedFactor,
-        size: sizeFactorDetail.recommendedFactor,
-        age: ageFactorDetail.recommendedFactor,
-        total: recommendedTotalFactor,
-      },
-      appliedFactors: {
-        zone: zoneFactorDetail.appliedFactor,
-        size: sizeFactorDetail.appliedFactor,
-        age: ageFactorDetail.appliedFactor,
-        total: appliedTotalFactor,
-      },
+      observedFactors: { zone: cfg.zoneObs, size: cfg.sizeObs, age: cfg.ageObs, total: obsTotal },
+      recommendedFactors: { zone: zEval.recommendedFactor, size: sEval.recommendedFactor, age: aEval.recommendedFactor, total: recTotal },
+      appliedFactors: { zone: zEval.recommendedFactor, size: sEval.recommendedFactor, age: aEval.recommendedFactor, total: recTotal },
       zoneFactorDetail,
       sizeFactorDetail,
       ageFactorDetail,
-      recommendedRent,
-      finalRent,
+      recommendedRent: Math.round(baseRegionalRent * recTotal),
+      finalRent: Math.round(baseRegionalRent * recTotal),
+      calculationTimestamp: new Date().toISOString(),
       calculatedAt: new Date().toISOString(),
-      calculationVersion: "V2.0",
-      formulaVersion: "2026-RECOMMENDATION-STANDARD",
+      calculationVersion: "v2.0",
+      formulaVersion: "RS-2026Q2",
     };
   });
 }

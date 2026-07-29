@@ -35,7 +35,7 @@ import { EfficiencyRateSubView } from "./components/subviews/EfficiencyRateSubVi
 import { ConversionSubView } from "./components/subviews/ConversionSubView";
 
 export default function App() {
-  const [activeMainMenu, setActiveMainMenu] = useState<MainMenuId>("overview");
+  const [activeMainMenu, setActiveMainMenu] = useState<MainMenuId>("s3");
   const [activeSubMenu, setActiveSubMenu] = useState<SubMenuId>("dashboard");
   const [datasets, setDatasets] = useState<DatasetMetadata[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>("2026-Q2-V1");
@@ -53,6 +53,38 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
+  const legacyMap: Record<string, [MainMenuId, SubMenuId]> = {
+    // Step 1
+    upload: ["s1", "upload"],
+    validation: ["s1", "validation"],
+    "column-mapping": ["s1", "column-mapping"],
+    datasets: ["s1", "datasets"],
+    // Step 2
+    eda: ["s2", "eda"],
+    conversion: ["s2", "conversion"],
+    comparables: ["s2", "comparables"],
+    // Step 3
+    dashboard: ["s3", "dashboard"],
+    "building-summary": ["s3", "dashboard"],
+    valuation: ["s3", "valuation"],
+    calculation: ["s3", "valuation"],
+    adjustment: ["s3", "adjustment"],
+    calibration: ["s3", "adjustment"],
+    "quarter-comparison": ["s3", "quarter-comparison"],
+    // Step 4
+    "quarterly-history": ["s4", "quarterly-history"],
+    history: ["s4", "quarterly-history"],
+    alerts: ["s4", "alerts"],
+    "change-history": ["s4", "change-history"],
+    // Reference
+    formula: ["ref", "formula"],
+    formulas: ["ref", "formula"],
+    "efficiency-rate": ["ref", "efficiency-rate"],
+    // Legacy Main aliases
+    overview: ["s3", "dashboard"],
+    data: ["s1", "upload"],
+  };
+
   const parseAndApplyHash = () => {
     const hash = window.location.hash.replace("#", "");
     if (!hash) return;
@@ -69,31 +101,6 @@ export default function App() {
         return;
       }
     }
-
-    // Single token fallback resolution
-    const legacyMap: Record<string, [MainMenuId, SubMenuId]> = {
-      dashboard: ["overview", "dashboard"],
-      "building-summary": ["overview", "dashboard"],
-      valuation: ["overview", "valuation"],
-      calculation: ["overview", "valuation"],
-      "quarter-comparison": ["overview", "quarter-comparison"],
-      alerts: ["overview", "alerts"],
-      eda: ["data", "eda"],
-      conversion: ["data", "conversion"],
-      calibration: ["data", "adjustment"],
-      adjustment: ["data", "adjustment"],
-      comparables: ["data", "comparables"],
-      upload: ["data", "upload"],
-      validation: ["data", "validation"],
-      datasets: ["data", "datasets"],
-      "column-mapping": ["data", "column-mapping"],
-      history: ["history", "quarterly-history"],
-      "quarterly-history": ["history", "quarterly-history"],
-      "change-history": ["history", "change-history"],
-      formula: ["history", "formula"],
-      formulas: ["history", "formula"],
-      "efficiency-rate": ["history", "efficiency-rate"],
-    };
 
     if (legacyMap[hash]) {
       const [m, s] = legacyMap[hash];
@@ -130,7 +137,6 @@ export default function App() {
   // Main menu or legacy navigation handler
   const handleNavigate = (mainOrSubId: string, subId?: string) => {
     if (subId) {
-      // (mainId, subId) form
       const m = mainOrSubId as MainMenuId;
       const s = subId as SubMenuId;
       setActiveMainMenu(m);
@@ -148,31 +154,6 @@ export default function App() {
       return;
     }
 
-    // Check legacy single token
-    const legacyMap: Record<string, [MainMenuId, SubMenuId]> = {
-      dashboard: ["overview", "dashboard"],
-      "building-summary": ["overview", "dashboard"],
-      valuation: ["overview", "valuation"],
-      calculation: ["overview", "valuation"],
-      "quarter-comparison": ["overview", "quarter-comparison"],
-      alerts: ["overview", "alerts"],
-      eda: ["data", "eda"],
-      conversion: ["data", "conversion"],
-      calibration: ["data", "adjustment"],
-      adjustment: ["data", "adjustment"],
-      comparables: ["data", "comparables"],
-      upload: ["data", "upload"],
-      validation: ["data", "validation"],
-      datasets: ["data", "datasets"],
-      "column-mapping": ["data", "column-mapping"],
-      history: ["history", "quarterly-history"],
-      "quarterly-history": ["history", "quarterly-history"],
-      "change-history": ["history", "change-history"],
-      formula: ["history", "formula"],
-      formulas: ["history", "formula"],
-      "efficiency-rate": ["history", "efficiency-rate"],
-    };
-
     if (legacyMap[mainOrSubId]) {
       const [m, s] = legacyMap[mainOrSubId];
       setActiveMainMenu(m);
@@ -182,8 +163,12 @@ export default function App() {
   };
 
   const handleSubMenuSelect = (sId: SubMenuId) => {
+    // Find parent main menu for sub menu if needed
+    const parentMain = mainNavigation.find((m) => m.children.some((c) => c.id === sId));
+    const targetMain = parentMain ? parentMain.id : activeMainMenu;
+    setActiveMainMenu(targetMain);
     setActiveSubMenu(sId);
-    window.location.hash = `#${activeMainMenu}/${sId}`;
+    window.location.hash = `#${targetMain}/${sId}`;
   };
 
   if (isInitializing) {
@@ -199,12 +184,9 @@ export default function App() {
     );
   }
 
-  // Determine sub navigation style for current main category
-  const isSidebarLayout = activeMainMenu === "data" || activeMainMenu === "history";
-
   return (
     <div className="min-h-screen bg-slate-100/70 pb-16 font-sans text-slate-900">
-      {/* Navigation Header (4 Top Main Menus) */}
+      {/* Navigation Header (4 Top Steps + Ref) */}
       <NavigationHeader
         activeMainMenu={activeMainMenu}
         activeSubMenu={activeSubMenu}
@@ -228,85 +210,81 @@ export default function App() {
 
         {/* Sub-view Content Body */}
         <div className="min-w-0 space-y-4">
-            {/* 1. 종합 현황 및 산정 (overview) */}
-            {activeMainMenu === "overview" && (
-              <>
-                {activeSubMenu === "dashboard" && (
-                  <OverallDashboardView
-                    selectedDatasetId={selectedDatasetId}
-                    onNavigateTab={handleNavigate}
-                  />
-                )}
-                {activeSubMenu === "valuation" && (
-                  <BuildingCalculationView
-                    selectedDatasetId={selectedDatasetId}
-                    onValuationConfirmed={async (dsId) => {
-                      await refreshDatasets(dsId);
-                    }}
-                  />
-                )}
-                {activeSubMenu === "quarter-comparison" && (
-                  <QuarterComparisonSubView selectedDatasetId={selectedDatasetId} />
-                )}
-                {activeSubMenu === "alerts" && (
-                  <AlertsSubView onNavigate={(m, s) => handleNavigate(m, s)} />
-                )}
-              </>
-            )}
+          {/* Sub-view Renderer directly based on activeSubMenu */}
+          {activeSubMenu === "upload" && (
+            <UploadDatasetView
+              existingDatasets={datasets}
+              onUploadSuccess={async (newId) => {
+                await refreshDatasets(newId);
+                handleNavigate("s1", "validation");
+              }}
+            />
+          )}
 
-            {/* 2. 데이터 및 보정 관리 (data) */}
-            {activeMainMenu === "data" && (
-              <>
-                {activeSubMenu === "eda" && (
-                  <EdaDashboardView
-                    selectedDatasetId={selectedDatasetId}
-                    onNavigateTab={(target) => {
-                      if (target === "calibration" || target === "adjustment") {
-                        handleNavigate("data", "adjustment");
-                      } else {
-                        handleNavigate(target);
-                      }
-                    }}
-                  />
-                )}
-                {activeSubMenu === "conversion" && <ConversionSubView />}
-                {activeSubMenu === "adjustment" && (
-                  <CalibrationFactorsView selectedDatasetId={selectedDatasetId} />
-                )}
-                {activeSubMenu === "comparables" && <ComparableListingsSubView />}
-                {activeSubMenu === "upload" && (
-                  <UploadDatasetView
-                    existingDatasets={datasets}
-                    onUploadSuccess={async (newId) => {
-                      await refreshDatasets(newId);
-                      handleNavigate("data", "validation");
-                    }}
-                  />
-                )}
-                {activeSubMenu === "validation" && (
-                  <DataValidationView
-                    selectedDatasetId={selectedDatasetId}
-                    onCalculationExecuted={async (dsId) => {
-                      await refreshDatasets(dsId);
-                      handleNavigate("overview", "valuation");
-                    }}
-                  />
-                )}
-                {activeSubMenu === "datasets" && <DatasetManagementView />}
-                {activeSubMenu === "column-mapping" && <ColumnMappingSubView />}
-              </>
-            )}
+          {activeSubMenu === "validation" && (
+            <DataValidationView
+              selectedDatasetId={selectedDatasetId}
+              onCalculationExecuted={async (dsId) => {
+                await refreshDatasets(dsId);
+                handleNavigate("s3", "valuation");
+              }}
+            />
+          )}
 
-            {/* 3. 이력·기준 관리 (history) */}
-            {activeMainMenu === "history" && (
-              <>
-                {activeSubMenu === "quarterly-history" && <QuarterlyHistoryView />}
-                {activeSubMenu === "change-history" && <AuditLogSubView />}
-                {activeSubMenu === "formula" && <FormulasView />}
-                {activeSubMenu === "efficiency-rate" && <EfficiencyRateSubView />}
-              </>
-            )}
-          </div>
+          {activeSubMenu === "column-mapping" && <ColumnMappingSubView />}
+          {activeSubMenu === "datasets" && <DatasetManagementView />}
+
+          {activeSubMenu === "eda" && (
+            <EdaDashboardView
+              selectedDatasetId={selectedDatasetId}
+              onNavigateTab={(target) => {
+                if (target === "calibration" || target === "adjustment") {
+                  handleNavigate("s3", "adjustment");
+                } else {
+                  handleNavigate(target);
+                }
+              }}
+            />
+          )}
+
+          {activeSubMenu === "conversion" && <ConversionSubView />}
+          {activeSubMenu === "comparables" && <ComparableListingsSubView />}
+
+          {activeSubMenu === "dashboard" && (
+            <OverallDashboardView
+              selectedDatasetId={selectedDatasetId}
+              onNavigateTab={handleNavigate}
+            />
+          )}
+
+          {activeSubMenu === "valuation" && (
+            <BuildingCalculationView
+              selectedDatasetId={selectedDatasetId}
+              onValuationConfirmed={async (dsId) => {
+                await refreshDatasets(dsId);
+                handleNavigate("s4", "quarterly-history");
+              }}
+            />
+          )}
+
+          {activeSubMenu === "adjustment" && (
+            <CalibrationFactorsView selectedDatasetId={selectedDatasetId} />
+          )}
+
+          {activeSubMenu === "quarter-comparison" && (
+            <QuarterComparisonSubView selectedDatasetId={selectedDatasetId} />
+          )}
+
+          {activeSubMenu === "quarterly-history" && <QuarterlyHistoryView />}
+
+          {activeSubMenu === "alerts" && (
+            <AlertsSubView onNavigate={(m, s) => handleNavigate(m, s)} />
+          )}
+
+          {activeSubMenu === "change-history" && <AuditLogSubView />}
+          {activeSubMenu === "formula" && <FormulasView />}
+          {activeSubMenu === "efficiency-rate" && <EfficiencyRateSubView />}
+        </div>
       </main>
     </div>
   );
