@@ -6,6 +6,8 @@
 import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { DatasetMetadata, RawListing, CleanedListing } from "../types/dataset";
+import { activeBuildingsInfo } from "../prdDataset";
+import { getActualContractStore, saveActualContractRent } from "../services/actualContractStore";
 import {
   parseExcelFile,
   validateAndCleanListings,
@@ -59,6 +61,7 @@ export function UploadDatasetView({
   const [refQuarter, setRefQuarter] = useState<1 | 2 | 3 | 4>(2);
   const [operatorName, setOperatorName] = useState<string>("자산운영담당자(김우체)");
   const [notes, setNotes] = useState<string>("");
+  const [actualContractRents, setActualContractRents] = useState<Record<string, number>>(() => getActualContractStore());
   const [file, setFile] = useState<File | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -341,6 +344,48 @@ export function UploadDatasetView({
             />
           </div>
 
+          {/* 2. Previous Quarter Own Building Actual Contract Rent Inputs */}
+          <div className="bg-slate-50 rounded-xl border border-slate-200 p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+              <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Settings2 className="w-3.5 h-3.5 text-indigo-600" />
+                2. 전분기 우리매물 실계약단가 입력
+              </h4>
+              <span className="text-[10px] text-indigo-600 font-mono font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                판단반영 참고용
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-normal">
+              반입 자료 산정 시 담당자 판단 반영계수 참고 지표로 자동 반영됩니다.
+            </p>
+            <div className="space-y-1.5">
+              {activeBuildingsInfo.map((b) => {
+                const val = actualContractRents[b.id] ?? 10000;
+                return (
+                  <div key={b.id} className="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/80 text-xs shadow-2xs">
+                    <span className="font-bold text-slate-700 text-xs flex items-center gap-1">
+                      <span>{b.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono font-normal">({b.city})</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={val}
+                        onChange={(e) => {
+                          const num = Number(e.target.value);
+                          setActualContractRents((prev) => ({ ...prev, [b.id]: num }));
+                          saveActualContractRent(b.id, num);
+                        }}
+                        className="w-24 px-2 py-0.5 text-right font-mono font-extrabold text-indigo-900 bg-slate-50 border border-indigo-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <span className="text-[11px] font-bold text-slate-500">원/㎡</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Download Sample Button */}
           <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
             <span className="text-slate-500">양식이 필요한 경우:</span>
@@ -355,11 +400,16 @@ export function UploadDatasetView({
         </div>
 
         {/* Right 7 Cols: File Drop & Upload Zone */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col justify-between">
-          <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            2. Excel 매물 파일 선택 및 반입 (.xlsx, .xls)
-          </h3>
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3 flex flex-col justify-start">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              Excel 매물 파일 업로드 (.xlsx, .xls)
+            </h3>
+            <span className="text-[10px] text-slate-400 font-mono">
+              '통합데이터' 시트 자동 감지
+            </span>
+          </div>
 
           <div
             onDragOver={(e) => {
@@ -374,12 +424,12 @@ export function UploadDatasetView({
                 processFile(e.dataTransfer.files[0]);
               }
             }}
-            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all flex flex-col items-center justify-center min-h-[200px] cursor-pointer ${
+            className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all flex flex-col items-center justify-center min-h-[160px] cursor-pointer ${
               isDragging
-                ? "border-indigo-500 bg-indigo-50/50"
+                ? "border-indigo-500 bg-indigo-50/50 shadow-inner"
                 : file
                 ? "border-emerald-400 bg-emerald-50/20"
-                : "border-slate-300 hover:border-slate-400 bg-slate-50/40"
+                : "border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/40 shadow-2xs"
             }`}
             onClick={() => document.getElementById("file-input")?.click()}
           >
@@ -393,30 +443,32 @@ export function UploadDatasetView({
 
             {isLoading ? (
               <div className="flex flex-col items-center gap-2 text-indigo-600">
-                <RefreshCw className="w-8 h-8 animate-spin" />
+                <RefreshCw className="w-7 h-7 animate-spin" />
                 <span className="text-xs font-bold">Excel '통합데이터' 시트 자동 인식 중...</span>
               </div>
             ) : file ? (
-              <div className="flex flex-col items-center gap-2">
-                <FileSpreadsheet className="w-10 h-10 text-emerald-600" />
+              <div className="flex flex-col items-center gap-1.5">
+                <FileSpreadsheet className="w-9 h-9 text-emerald-600" />
                 <div>
-                  <p className="text-sm font-bold text-slate-800">{file.name}</p>
-                  <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  <p className="text-xs font-extrabold text-slate-800">{file.name}</p>
+                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">
                     {(file.size / 1024).toFixed(1)} KB • SHA-256: {fileHash.slice(0, 12)}...
                   </p>
                 </div>
-                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold mt-2">
-                  파싱 완료 - 진단 결과 확인
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold mt-1">
+                  파싱 완료 - 하단 진단 결과 확인
                 </span>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
-                <Upload className="w-10 h-10 text-slate-400" />
-                <p className="text-xs font-bold text-slate-700">
+                <div className="w-10 h-10 rounded-full bg-indigo-100/80 text-indigo-600 flex items-center justify-center">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-extrabold text-indigo-950 px-2">
                   '임대료 기준가격 매물 데이터.xlsx' 파일을 이곳에 드래그하거나 클릭하여 선택하세요
                 </p>
-                <p className="text-[11px] text-slate-400">
-                  '통합데이터' 시트 2행 헤더를 자동 감지하며, 43개 전체 열 구조를 자동 분석합니다.
+                <p className="text-[11px] text-slate-500 font-medium max-w-md">
+                  알스퀘어·네모 크롤링 43개 전체 열 구조 및 2행 헤더를 자동으로 인식하고 검증합니다.
                 </p>
               </div>
             )}

@@ -340,11 +340,11 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
 
           <div className="flex items-center gap-2 self-start md:self-auto">
             <button
-              onClick={() => onNavigateTab("calibration")}
+              onClick={() => onNavigateTab("valuation")}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition"
             >
               <Sliders className="w-4 h-4" />
-              <span>보정계수 검토·조정 탭 이동</span>
+              <span>3단계 임대가격 산정으로 이동</span>
             </button>
           </div>
         </div>
@@ -737,10 +737,10 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
           </div>
 
           <button
-            onClick={() => onNavigateTab("calibration")}
+            onClick={() => onNavigateTab("valuation")}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg transition"
           >
-            <span>보정계수 검토·조정 탭으로 이동</span>
+            <span>임대가격 산정 탭으로 이동</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

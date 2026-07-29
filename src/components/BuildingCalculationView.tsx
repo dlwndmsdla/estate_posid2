@@ -59,8 +59,8 @@ export function BuildingCalculationView({
     finalRent: number;
   } | null>(null);
 
-  // Operator Adjustments State
-  const [appliedZoneFactor, setAppliedZoneFactor] = useState<number>(1.085);
+  // Operator Adjustments State - defaults to recommended factors on calculation load
+  const [appliedZoneFactor, setAppliedZoneFactor] = useState<number>(1.0);
   const [appliedSizeFactor, setAppliedSizeFactor] = useState<number>(1.0);
   const [appliedAgeFactor, setAppliedAgeFactor] = useState<number>(1.0);
   const [appliedMarketFactor, setAppliedMarketFactor] = useState<number>(1.0);
@@ -451,8 +451,18 @@ export function BuildingCalculationView({
       appliedMarketFactor !== (calculationResult.recommendedFactors.marketPolicy ?? 1.000));
 
   const appliedTotalFactor = Number((appliedZoneFactor * appliedSizeFactor * appliedAgeFactor * appliedMarketFactor).toFixed(3));
+  
+  const isAtRecommended =
+    calculationResult &&
+    appliedZoneFactor === calculationResult.recommendedFactors.zone &&
+    appliedSizeFactor === calculationResult.recommendedFactors.size &&
+    appliedAgeFactor === calculationResult.recommendedFactors.age &&
+    appliedMarketFactor === (calculationResult.recommendedFactors.marketPolicy ?? 1.000);
+
   const calculatedFinalRent = calculationResult
-    ? Math.round(calculationResult.baseRegionalRent * appliedTotalFactor)
+    ? (isAtRecommended
+        ? calculationResult.recommendedRent
+        : Math.round(calculationResult.baseRegionalRent * appliedTotalFactor))
     : 0;
 
   const handleConfirmValuation = async () => {

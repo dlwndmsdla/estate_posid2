@@ -19,9 +19,7 @@ import { EdaDashboardView } from "./components/EdaDashboardView";
 import { UploadDatasetView } from "./components/UploadDatasetView";
 import { DataValidationView } from "./components/DataValidationView";
 import { BuildingCalculationView } from "./components/BuildingCalculationView";
-import { CalibrationFactorsView } from "./components/CalibrationFactorsView";
 import { QuarterlyHistoryView } from "./components/QuarterlyHistoryView";
-import { DatasetManagementView } from "./components/DatasetManagementView";
 import { FormulasView } from "./components/FormulasView";
 
 // SubViews
@@ -232,17 +230,12 @@ export default function App() {
           )}
 
           {activeSubMenu === "column-mapping" && <ColumnMappingSubView />}
-          {activeSubMenu === "datasets" && <DatasetManagementView />}
 
           {activeSubMenu === "eda" && (
             <EdaDashboardView
               selectedDatasetId={selectedDatasetId}
               onNavigateTab={(target) => {
-                if (target === "calibration" || target === "adjustment") {
-                  handleNavigate("s3", "adjustment");
-                } else {
-                  handleNavigate(target);
-                }
+                handleNavigate(target);
               }}
             />
           )}
@@ -265,10 +258,6 @@ export default function App() {
                 handleNavigate("s4", "quarterly-history");
               }}
             />
-          )}
-
-          {activeSubMenu === "adjustment" && (
-            <CalibrationFactorsView selectedDatasetId={selectedDatasetId} />
           )}
 
           {activeSubMenu === "quarter-comparison" && (
