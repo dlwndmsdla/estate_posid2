@@ -11,7 +11,7 @@ export interface ActualContractData {
   updatedBy?: string;
 }
 
-const STORAGE_KEY = "opm_actual_contract_rents_v1";
+const STORAGE_KEY = "opm_actual_contract_rents_v2";
 
 // Standard default baselines for previous quarter (2026-Q1)
 const DEFAULT_PREV_BASELINES: Record<string, number> = {
@@ -25,10 +25,10 @@ const DEFAULT_PREV_BASELINES: Record<string, number> = {
 // Default actual contract rents (~95% of baseline)
 const DEFAULT_ACTUAL_CONTRACT_RENTS: Record<string, number> = {
   dangsan: 13487,
-  yeongdeungpo: 12100,
-  busan: 8150,
-  daegu: 4940,
-  gwangju: 5890,
+  yeongdeungpo: 13487,
+  busan: 9459,
+  daegu: 5634,
+  gwangju: 7077,
 };
 
 export function getActualContractStore(): Record<string, number> {
