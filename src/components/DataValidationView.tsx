@@ -197,7 +197,7 @@ export function DataValidationView({
             분기 반입 매물 데이터 정합성 검증 및 세부 산정가능 상태 분석
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            치명적 오류(Invalid)와 특정 단계 보정제외(Warning)를 명확히 분리하여 정상 매물의 연면적 누락으로 인한 부당한 전체 제외를 방지합니다.
+            치명적 오류(Invalid)를 수집 및 자동 검증하여 정상 매물의 안정적인 적정 임대가격 산정을 보장합니다.
           </p>
         </div>
 
@@ -220,20 +220,14 @@ export function DataValidationView({
         </button>
       </div>
 
-      {/* Re-validation Summary Grid (Requirements Item #7) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* Re-validation Summary Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
           <div className="text-[11px] font-bold text-slate-500">전체 매물 / Invalid</div>
           <div className="flex items-baseline gap-1.5 mt-1">
             <span className="text-lg font-black text-slate-800">{totalCount}건</span>
             <span className="text-xs font-bold text-rose-600">({invalidCount}건 Invalid)</span>
           </div>
-        </div>
-
-        <div className="bg-white border border-amber-200 bg-amber-50/30 rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11px] font-bold text-amber-800">Warning (주의)</div>
-          <div className="text-lg font-black text-amber-700 mt-1">{warningCount}건</div>
-          <div className="text-[10px] text-amber-600 font-medium">연면적 누락 등 포함</div>
         </div>
 
         <div className="bg-white border border-emerald-200 bg-emerald-50/30 rounded-xl p-3.5 shadow-xs">
@@ -287,15 +281,6 @@ export function DataValidationView({
           </button>
 
           <button
-            onClick={() => setStatusFilter("warning")}
-            className={`px-3 py-1.5 rounded-lg font-bold transition ${
-              statusFilter === "warning" ? "bg-amber-600 text-white" : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-            }`}
-          >
-            Warning 주의 ({warningCount})
-          </button>
-
-          <button
             onClick={() => setStatusFilter("invalid")}
             className={`px-3 py-1.5 rounded-lg font-bold transition ${
               statusFilter === "invalid" ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700 hover:bg-rose-100"
@@ -305,7 +290,7 @@ export function DataValidationView({
           </button>
         </div>
 
-        {/* Detailed Verification Rule Categories (Requirements Item #6) */}
+        {/* Detailed Verification Rule Categories */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
           <span className="font-bold text-slate-600 mr-1">검증 상세 유형:</span>
 
@@ -321,22 +306,11 @@ export function DataValidationView({
           </button>
 
           <button
-            onClick={() => setStatusFilter("GROSS_FLOOR_AREA_MISSING")}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition ${
-              statusFilter === "GROSS_FLOOR_AREA_MISSING"
-                ? "bg-amber-700 text-white border-amber-700"
-                : "bg-white text-amber-700 border-amber-200 hover:bg-amber-50"
-            }`}
-          >
-            연면적 누락 [Warning] ({grossAreaMissingCount})
-          </button>
-
-          <button
             onClick={() => setStatusFilter("CONTRACT_AREA_LE_ZERO")}
             className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition ${
               statusFilter === "CONTRACT_AREA_LE_ZERO"
-                ? "bg-amber-700 text-white border-amber-700"
-                : "bg-white text-amber-700 border-amber-200 hover:bg-amber-50"
+                ? "bg-rose-700 text-white border-rose-700"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
             }`}
           >
             알스퀘어 계약면적 오류 ({contractAreaErrorCount})
@@ -346,8 +320,8 @@ export function DataValidationView({
             onClick={() => setStatusFilter("EXCLUSIVE_GREATER_THAN_CONTRACT")}
             className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition ${
               statusFilter === "EXCLUSIVE_GREATER_THAN_CONTRACT"
-                ? "bg-amber-700 text-white border-amber-700"
-                : "bg-white text-amber-700 border-amber-200 hover:bg-amber-50"
+                ? "bg-rose-700 text-white border-rose-700"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
             }`}
           >
             전용률 논리 오류 ({exclusiveGreaterCount})
@@ -409,11 +383,7 @@ export function DataValidationView({
                     <tr
                       key={item.id}
                       className={`hover:bg-slate-50 transition ${
-                        !item.validation.isValid
-                          ? "bg-rose-50/20"
-                          : item.validation.warningCodes.length > 0
-                          ? "bg-amber-50/10"
-                          : ""
+                        !item.validation.isValid ? "bg-rose-50/20" : ""
                       }`}
                     >
                       <td className="px-3.5 py-3 text-center font-mono text-slate-400 font-sans">
@@ -453,8 +423,8 @@ export function DataValidationView({
                           {grossArea > 0 ? (
                             <span className="text-slate-600 font-semibold">{grossArea.toLocaleString()} ㎡</span>
                           ) : (
-                            <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-bold text-[10px]">
-                              연면적 null
+                            <span className="text-slate-400 font-medium text-[10px]">
+                              미기재
                             </span>
                           )}
                         </div>
@@ -492,7 +462,7 @@ export function DataValidationView({
                         {item.rentPerContractArea.toLocaleString()} 원/㎡
                       </td>
 
-                      {/* Step-by-Step Eligibility Badges (Requirements Item #4) */}
+                      {/* Step-by-Step Eligibility Badges */}
                       <td className="px-3.5 py-3 text-center">
                         <div className="flex flex-col gap-1 items-center text-[10px] font-sans font-bold">
                           <span
@@ -508,35 +478,23 @@ export function DataValidationView({
                             className={`px-1.5 py-0.5 rounded ${
                               item.eligibility?.validForSizeAdjustment
                                 ? "bg-purple-100 text-purple-800"
-                                : "bg-amber-100 text-amber-800"
+                                : "bg-slate-100 text-slate-500"
                             }`}
                           >
                             {item.eligibility?.validForSizeAdjustment
                               ? "✓ 규모보정 포함"
-                              : "⚠️ 규모보정 제외"}
+                              : "규모보정 미적용"}
                           </span>
                         </div>
                       </td>
 
-                      {/* Validation Errors & Warnings Detail (Requirements Item #6) */}
+                      {/* Validation Errors & Status Detail */}
                       <td className="px-3.5 py-3 text-center">
                         {item.validation.isValid ? (
-                          item.validation.warningCodes.length === 0 ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold text-[11px]">
-                              <CheckCircle2 className="w-3 h-3" />
-                              정상
-                            </span>
-                          ) : (
-                            <div className="space-y-1">
-                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[11px]">
-                                <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                Warning
-                              </span>
-                              <div className="text-[10px] text-amber-700 font-sans max-w-[140px] truncate">
-                                {item.validation.warningCodes.join(", ")}
-                              </div>
-                            </div>
-                          )
+                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold text-[11px]">
+                            <CheckCircle2 className="w-3 h-3" />
+                            정상
+                          </span>
                         ) : (
                           <div className="space-y-1">
                             <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded font-bold text-[11px]">

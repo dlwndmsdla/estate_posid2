@@ -24,7 +24,7 @@ const DEFAULT_PREV_BASELINES: Record<string, number> = {
 
 // Default actual contract rents (~95% of baseline)
 const DEFAULT_ACTUAL_CONTRACT_RENTS: Record<string, number> = {
-  dangsan: 13300,
+  dangsan: 13487,
   yeongdeungpo: 12100,
   busan: 8150,
   daegu: 4940,

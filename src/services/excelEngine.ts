@@ -709,35 +709,14 @@ export function validateAndCleanListings(
       rentErrorCount++;
     }
 
-    // 2. Warning Checks (Non-fatal, data quality warnings)
-    if (!r.zone) {
-      warningCodes.push("MISSING_ZONE");
-    }
+    // 2. Data Cleaning & Normalization (Non-fatal quality handling)
     if (!r.roadAddress && !r.address) {
-      warningCodes.push("MISSING_ADDRESS");
       addressMissingCount++;
     }
-    if (!r.buildingName || r.buildingName === "미지정 건물") {
-      warningCodes.push("UNSPECIFIED_BUILDING_NAME");
-    }
     const compYear = r.builtYear ?? r.completionYear ?? 0;
-    if (compYear <= 0) {
-      warningCodes.push("MISSING_BUILT_YEAR");
-    } else if (compYear > referenceYear) {
-      warningCodes.push("COMPLETION_AFTER_REFERENCE");
-    }
-    if (!r.primaryUse || r.primaryUse === "0") {
-      warningCodes.push("MISSING_PRIMARY_USE");
-    }
 
-    // CRITICAL REQUIREMENT: Missing Gross Floor Area is WARNING ONLY (not Invalid!)
     if (grossArea <= 0) {
-      warningCodes.push("GROSS_FLOOR_AREA_MISSING");
       grossFloorAreaMissingCount++;
-    }
-
-    if (maintVal <= 0) {
-      warningCodes.push("MISSING_MAINTENANCE_FEE");
     }
 
     // Duplicates
@@ -748,8 +727,6 @@ export function validateAndCleanListings(
     if (isDupListingId) {
       errorCodes.push("DUPLICATE_LISTING_ID");
       duplicateRowCount++;
-    } else if (isDupProperty) {
-      warningCodes.push("DUPLICATE_PROPERTY_SUSPECT");
     }
 
     // Standard Efficiency Rate Application

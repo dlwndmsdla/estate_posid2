@@ -605,7 +605,7 @@ export function UploadDatasetView({
           )}
 
           {/* Validation Record Cards Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 text-xs">
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
               <span className="text-slate-400 text-[10px] block">전체 매물 행 수</span>
               <span className="text-lg font-extrabold font-mono text-slate-800 mt-0.5 block">
@@ -617,13 +617,6 @@ export function UploadDatasetView({
               <span className="text-emerald-700 text-[10px] block font-bold">정상 매물 행 수</span>
               <span className="text-lg font-extrabold font-mono text-emerald-800 mt-0.5 block">
                 {validationSummary.validRowCount.toLocaleString()} 건
-              </span>
-            </div>
-
-            <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-100">
-              <span className="text-amber-700 text-[10px] block font-bold">Warning 매물 수</span>
-              <span className="text-lg font-extrabold font-mono text-amber-800 mt-0.5 block">
-                {validationSummary.warningRowCount.toLocaleString()} 건
               </span>
             </div>
 
@@ -645,21 +638,21 @@ export function UploadDatasetView({
           {/* Detailed Error Breakdown */}
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 text-xs space-y-2">
             <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-              세부 예외·Warning 분류 요약
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              세부 데이터 검증 및 반영 상태 요약
             </h4>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-slate-600 font-medium pt-1">
               <div>
-                연면적 누락 (Warning):{" "}
-                <span className="font-mono text-amber-700 font-bold">
-                  {validationSummary.grossFloorAreaMissingCount}건
+                연면적 미기재:{" "}
+                <span className="font-mono text-slate-800 font-bold">
+                  {validationSummary.grossFloorAreaMissingCount}건 (정상 포함)
                 </span>
               </div>
               <div>
-                주소 누락:{" "}
+                주소 정보:{" "}
                 <span className="font-mono text-slate-800 font-bold">
-                  {validationSummary.addressMissingCount}건
+                  {validationSummary.totalRowCount - validationSummary.addressMissingCount}건 수집
                 </span>
               </div>
               <div>
@@ -786,14 +779,6 @@ export function UploadDatasetView({
                     정상
                   </button>
                   <button
-                    onClick={() => setPreviewFilter("warning")}
-                    className={`px-3 py-1 rounded-lg font-bold transition ${
-                      previewFilter === "warning" ? "bg-white text-amber-700 shadow-xs" : "text-slate-500"
-                    }`}
-                  >
-                    Warning
-                  </button>
-                  <button
                     onClick={() => setPreviewFilter("invalid")}
                     className={`px-3 py-1 rounded-lg font-bold transition ${
                       previewFilter === "invalid" ? "bg-white text-rose-700 shadow-xs" : "text-slate-500"
@@ -854,14 +839,13 @@ export function UploadDatasetView({
 
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {filteredPreviewListings.slice(0, 50).map((item) => {
-                    const isWarn = item.validation.warningCodes.length > 0;
                     const isErr = !item.validation.isValid;
 
                     return (
                       <tr
                         key={item.id}
                         className={`hover:bg-slate-50 transition ${
-                          isErr ? "bg-rose-50/30" : isWarn ? "bg-amber-50/20" : ""
+                          isErr ? "bg-rose-50/30" : ""
                         }`}
                       >
                         <td className="p-2 text-center text-slate-400 font-mono border-r border-slate-100">
@@ -896,11 +880,6 @@ export function UploadDatasetView({
                             <span className="inline-flex items-center gap-1 text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">
                               <XCircle className="w-3 h-3" />
                               오류
-                            </span>
-                          ) : isWarn ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
-                              <AlertTriangle className="w-3 h-3" />
-                              경고
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
