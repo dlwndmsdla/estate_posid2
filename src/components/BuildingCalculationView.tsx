@@ -262,6 +262,9 @@ export function BuildingCalculationView({
     }
   };
 
+  const datasetQuarterLabel = dataset
+    ? `${dataset.referenceYear}년 ${dataset.referenceQuarter}분기`
+    : "분기 미선택";
   const activeSpec = activeBuildingsInfo.find((b) => b.id === selectedBuildingId) || activeBuildingsInfo[0];
 
   return (
@@ -346,7 +349,7 @@ export function BuildingCalculationView({
             ) : (
               <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0">
                 <Clock className="w-4 h-4 text-indigo-400" />
-                2026년 2분기 임대가격 산정 진행 중
+                {datasetQuarterLabel} 임대가격 산정 진행 중
               </span>
             )}
           </div>
@@ -359,7 +362,7 @@ export function BuildingCalculationView({
                 <span className="text-xs font-black text-indigo-950 bg-amber-300 px-3 py-0.5 rounded-full shadow-xs uppercase tracking-wider flex items-center gap-1">
                   ★ 핵심 확정/산정 가격
                 </span>
-                <span className="text-xs text-indigo-200 font-mono font-bold">2026년 2분기</span>
+                <span className="text-xs text-indigo-200 font-mono font-bold">{datasetQuarterLabel}</span>
               </div>
 
               <div className="my-3">
@@ -535,7 +538,7 @@ export function BuildingCalculationView({
                   <div className="bg-indigo-50/90 p-2.5 rounded-lg border border-indigo-100 text-[11px] font-mono text-indigo-950 flex flex-col sm:flex-row justify-between sm:items-center gap-1">
                     <span className="font-bold text-indigo-900">계산 근거 (권역 중앙값 ÷ 지역 전체 중앙값):</span>
                     <span className="font-bold text-indigo-950 bg-white px-2 py-0.5 rounded border border-indigo-200/60 shadow-xs">
-                      {calculationResult.zoneFactorDetail.formulaDescription || `권역 중앙값 ${calculationResult.zoneFactorDetail.targetGroupMedian?.toLocaleString()}원 / 지역 중앙값 ${calculationResult.baseRegionalRent.toLocaleString()}원 = ${calculationResult.zoneFactorDetail.observedFactor.toFixed(3)}`}
+                      {calculationResult.zoneFactorDetail.formulaDescription || "산출 근거가 저장되지 않은 이전 버전 결과입니다. 산정을 다시 실행해 주세요."}
                     </span>
                   </div>
 
@@ -658,7 +661,7 @@ export function BuildingCalculationView({
                   <div className="bg-emerald-50/90 p-2.5 rounded-lg border border-emerald-100 text-[11px] font-mono text-emerald-950 flex flex-col sm:flex-row justify-between sm:items-center gap-1">
                     <span className="font-bold text-emerald-900">계산 근거 (유사규모 중앙값 ÷ 권역 중앙값):</span>
                     <span className="font-bold text-emerald-950 bg-white px-2 py-0.5 rounded border border-emerald-200/60 shadow-xs">
-                      {calculationResult.sizeFactorDetail.formulaDescription || `동일규모 중앙값 ${calculationResult.sizeFactorDetail.targetGroupMedian?.toLocaleString()}원 / 권역 중앙값 ${calculationResult.sizeFactorDetail.baseGroupMedian?.toLocaleString()}원 = ${calculationResult.sizeFactorDetail.observedFactor.toFixed(3)}`}
+                      {calculationResult.sizeFactorDetail.formulaDescription || "산출 근거가 저장되지 않은 이전 버전 결과입니다. 산정을 다시 실행해 주세요."}
                     </span>
                   </div>
 
@@ -781,7 +784,7 @@ export function BuildingCalculationView({
                   <div className="bg-amber-50/90 p-2.5 rounded-lg border border-amber-100 text-[11px] font-mono text-amber-950 flex flex-col sm:flex-row justify-between sm:items-center gap-1">
                     <span className="font-bold text-amber-900">계산 근거 (유사연식 중앙값 ÷ 유사규모 중앙값):</span>
                     <span className="font-bold text-amber-950 bg-white px-2 py-0.5 rounded border border-amber-200/60 shadow-xs">
-                      {calculationResult.ageFactorDetail.formulaDescription || `유사연식·유사규모 중앙값 ${calculationResult.ageFactorDetail.targetGroupMedian?.toLocaleString()}원 / 유사규모 중앙값 ${calculationResult.ageFactorDetail.baseGroupMedian?.toLocaleString()}원 = ${calculationResult.ageFactorDetail.observedFactor.toFixed(3)}`}
+                      {calculationResult.ageFactorDetail.formulaDescription || "산출 근거가 저장되지 않은 이전 버전 결과입니다. 산정을 다시 실행해 주세요."}
                     </span>
                   </div>
 

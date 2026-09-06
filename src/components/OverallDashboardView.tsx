@@ -33,6 +33,7 @@ export function OverallDashboardView({
   const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
   const [calcs, setCalcs] = useState<CalculationResult[]>([]);
   const [selectedBldgId, setSelectedBldgId] = useState<string>("dangsan");
+  const [prevRents, setPrevRents] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadDashboard();
@@ -45,6 +46,24 @@ export function OverallDashboardView({
 
       const results = await valuationRepository.getCalculationResultsByDataset(selectedDatasetId);
       setCalcs(results);
+
+      // 전분기 확정가 — 카드의 '전분기 대비' 비교 대상.
+      const prev: Record<string, number> = {};
+      if (ds) {
+        const prevYear = ds.referenceQuarter === 1 ? ds.referenceYear - 1 : ds.referenceYear;
+        const prevQuarter = ds.referenceQuarter === 1 ? 4 : ds.referenceQuarter - 1;
+        const all = await datasetRepository.listDatasets();
+        const prevDs = all.find(
+          (d) => d.referenceYear === prevYear && d.referenceQuarter === prevQuarter
+        );
+        if (prevDs) {
+          for (const b of activeBuildingsInfo) {
+            const v = await valuationRepository.getConfirmedValuation(prevDs.datasetId, b.id);
+            if (v) prev[b.id] = v.finalRent;
+          }
+        }
+      }
+      setPrevRents(prev);
     } catch (err: any) {
       console.error(err);
     }
@@ -52,14 +71,29 @@ export function OverallDashboardView({
 
   const selectedBuildingSpec = activeBuildingsInfo.find((b) => b.id === selectedBldgId) || activeBuildingsInfo[0];
 
-  // Benchmark Rents per building
-  const buildingRents: Record<string, { rent: number; prevRent: number; changePct: number }> = {
-    dangsan: { rent: 12258, prevRent: 13063, changePct: -6.2 },
-    yeongdeungpo: { rent: 12258, prevRent: 12724, changePct: -3.7 },
-    busan: { rent: 9406, prevRent: 8772, changePct: 7.2 },
-    daegu: { rent: 9757, prevRent: 8457, changePct: 15.4 },
-    gwangju: { rent: 7739, prevRent: 7035, changePct: 10.0 },
-  };
+  // 회관별 단가 — 산정 결과에서 유도한다. 예전엔 다섯 값이 상수로 박혀 있어
+  // 어떤 데이터셋을 골라도 카드가 같은 숫자를 보여 줬다.
+  const buildingRents: Record<string, { rent: number; prevRent: number; changePct: number }> = {};
+  for (const c of calcs) {
+    const prevRent = prevRents[c.buildingId] ?? 0;
+    buildingRents[c.buildingId] = {
+      rent: c.finalRent,
+      prevRent,
+      changePct:
+        prevRent > 0 ? Number((((c.finalRent - prevRent) / prevRent) * 100).toFixed(1)) : 0,
+    };
+  }
+
+  const quarterLabel = dataset
+    ? `${dataset.referenceYear}년 ${dataset.referenceQuarter}분기`
+    : "분기 미선택";
+  const shortQuarterLabel = dataset
+    ? `${dataset.referenceYear} ${dataset.referenceQuarter}Q`
+    : "-";
+
+  const hallRentAverage = calcs.length
+    ? Math.round(calcs.reduce((sum, c) => sum + c.finalRent, 0) / calcs.length)
+    : 0;
 
   return (
     <div className="space-y-6 font-sans">
@@ -71,11 +105,12 @@ export function OverallDashboardView({
               OPM WORKFLOW
             </span>
             <h2 className="text-sm font-extrabold text-white">
-              2026년 2분기 임대기준가격 산정 4단계 파이프라인
+              {quarterLabel} 임대기준가격 산정 4단계 파이프라인
             </h2>
           </div>
           <span className="text-xs text-slate-400 font-mono">
-            대상 분기: <strong>2026 2Q</strong> • 기준일: <strong>2026-07-28</strong>
+            대상 분기: <strong>{shortQuarterLabel}</strong> • 기준일:{" "}
+            <strong>{dataset ? dataset.uploadedAt.slice(0, 10) : "-"}</strong>
           </span>
         </div>
 
@@ -89,7 +124,7 @@ export function OverallDashboardView({
               <span className="font-mono font-black text-emerald-400">1단계 · 자료 반입</span>
               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-mono">완료</span>
             </div>
-            <p className="text-xs font-bold text-slate-200">1,117건 크롤링 매물 반입</p>
+            <p className="text-xs font-bold text-slate-200">{(dataset?.totalRowCount ?? 0).toLocaleString()}건 크롤링 매물 반입</p>
             <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 group-hover:text-indigo-300 transition">
               <span>반입·열매핑 관리</span>
               <ChevronRight className="w-3 h-3" />
@@ -105,7 +140,7 @@ export function OverallDashboardView({
               <span className="font-mono font-black text-indigo-300">2단계 · 검증·탐색</span>
               <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.2 rounded font-mono">완료</span>
             </div>
-            <p className="text-xs font-bold text-slate-200">1,106건 유효 매물 정합성</p>
+            <p className="text-xs font-bold text-slate-200">{(dataset?.validRowCount ?? 0).toLocaleString()}건 유효 매물 정합성</p>
             <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 group-hover:text-indigo-300 transition">
               <span>EDA 및 전용률 탐색</span>
               <ChevronRight className="w-3 h-3" />
@@ -164,21 +199,21 @@ export function OverallDashboardView({
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-1">
           <span className="text-[11px] font-bold text-slate-400 block">반입 크롤링 매물</span>
           <span className="text-xl font-black font-mono text-slate-900 block">
-            1,117 <small className="text-xs text-slate-500 font-sans">건</small>
+            {(dataset?.totalRowCount ?? 0).toLocaleString()} <small className="text-xs text-slate-500 font-sans">건</small>
           </span>
           <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
-            유효 1,106건 • 354개 건물동
+            유효 {(dataset?.validRowCount ?? 0).toLocaleString()}건 • {(dataset?.uniqueBuildingCount ?? 0).toLocaleString()}개 건물동
           </span>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-1">
           <span className="text-[11px] font-bold text-slate-400 block">회관 평균 임대기준가</span>
           <span className="text-xl font-black font-mono text-indigo-900 block">
-            10,284 <small className="text-xs text-slate-500 font-sans">원/㎡·월</small>
+            {hallRentAverage.toLocaleString()} <small className="text-xs text-slate-500 font-sans">원/㎡·월</small>
           </span>
           <span className="text-[11px] text-indigo-600 font-bold block">
-            전국 5개 회관 산정 평균
+            전국 {calcs.length}개 회관 산정 평균
           </span>
         </div>
 
@@ -223,7 +258,7 @@ export function OverallDashboardView({
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {activeBuildingsInfo.map((b) => {
             const isSelected = b.id === selectedBldgId;
-            const rData = buildingRents[b.id] || { rent: 10000, prevRent: 10000, changePct: 0 };
+            const rData = buildingRents[b.id] || { rent: 0, prevRent: 0, changePct: 0 };
 
             return (
               <button
@@ -307,9 +342,9 @@ export function OverallDashboardView({
                 </strong>
               </div>
               <div className="bg-white/80 p-2.5 rounded-lg border border-indigo-100">
-                <span className="text-slate-500 block">2026 2Q 산정 기준가</span>
+                <span className="text-slate-500 block">{shortQuarterLabel} 산정 기준가</span>
                 <strong className="text-indigo-700 font-extrabold font-mono">
-                  {(buildingRents[selectedBldgId]?.rent || 10000).toLocaleString()} 원/㎡·월
+                  {(buildingRents[selectedBldgId]?.rent ?? 0).toLocaleString()} 원/㎡·월
                 </strong>
               </div>
             </div>
@@ -445,14 +480,14 @@ export function OverallDashboardView({
                 <th className="py-2.5 px-3">회관명</th>
                 <th className="py-2.5 px-3">권역 위치</th>
                 <th className="py-2.5 px-3 text-right">직전 분기 (2026 1Q)</th>
-                <th className="py-2.5 px-3 text-right">이번 분기 (2026 2Q)</th>
+                <th className="py-2.5 px-3 text-right">이번 분기 ({shortQuarterLabel})</th>
                 <th className="py-2.5 px-3 text-right">전분기 대비 변동</th>
                 <th className="py-2.5 px-3 text-right">현재 적용가 대비</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {activeBuildingsInfo.map((b) => {
-                const r = buildingRents[b.id] || { rent: 10000, prevRent: 10000, changePct: 0 };
+                const r = buildingRents[b.id] || { rent: 0, prevRent: 0, changePct: 0 };
                 return (
                   <tr key={b.id} className="hover:bg-slate-50/80">
                     <td className="py-3 px-3 font-bold text-slate-900">{b.name}</td>
