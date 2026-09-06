@@ -32,6 +32,10 @@ const DEFAULT_ACTUAL_CONTRACT_RENTS: Record<string, number> = {
 };
 
 export function getActualContractStore(): Record<string, number> {
+  // 브라우저 밖(테스트·서버)에서도 호출되므로 기본값으로 조용히 물러난다.
+  if (typeof localStorage === "undefined") {
+    return { ...DEFAULT_ACTUAL_CONTRACT_RENTS };
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {

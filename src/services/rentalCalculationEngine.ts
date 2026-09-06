@@ -12,7 +12,9 @@ import {
   BuildingMedian,
   HallComparisonRow,
   CalculationResult,
+  FactorDetail,
 } from "../types/dataset";
+import { getActualContractStore } from "./actualContractStore";
 
 export function safeFactor(
   numerator: number | null | undefined,
@@ -860,200 +862,229 @@ export function calculateHallComparison(
 
 /**
  * 9. Valuation & Adjustment Factors Calculation (`calculateAdjustmentFactors`)
+ *
+ * 업로드된 데이터셋의 건물별 중앙값에서 회관별 산정 결과를 계산한다.
+ *
+ * 캐스케이드: 지역 기준단가 × K권역 × K규모 × K연식
+ *   ① 권역 = 회관 권역 건물 중앙값 ÷ 지역 건물 중앙값
+ *   ② 규모 = 권역 ∩ 동일 규모군 중앙값 ÷ 권역 중앙값
+ *   ③ 연식 = 규모군 ∩ 준공 ±5년 중앙값 ÷ 규모군 중앙값
+ *
+ * 각 단계는 게이트(표본 ≥ 5건 AND IQR ÷ 중앙값 ≤ 15%)를 통과해야 관측계수를
+ * 적용하고, 못 넘으면 중립값 1.000 을 쓴다. 표본이 적거나 값이 흩어진 비교군이
+ * 계수를 흔드는 것을 막기 위한 장치로, 2026-07-28 방법비교에서 MAPE 4.2% 로
+ * 1위였던 로직 그대로다(`260728_방법비교_계산.py` 의 `gate`).
  */
+
+/** 회관의 물리적 제원. 계산 결과가 아니라 건물 자체의 사실이라 고정값이다. */
+const HALL_SPECS = [
+  { buildingId: "dangsan", buildingName: "당산회관", region: "서울", zone: "당산_문래", grossArea: 23573.93, builtYear: 2021 },
+  { buildingId: "yeongdeungpo", buildingName: "영등포회관", region: "서울", zone: "영등포", grossArea: 14476.76, builtYear: 1988 },
+  { buildingId: "busan", buildingName: "부산회관", region: "부산", zone: "중구_남포중앙동", grossArea: 33148.77, builtYear: 1989 },
+  { buildingId: "daegu", buildingName: "대구회관", region: "대구", zone: "중구남구_도심", grossArea: 22894.63, builtYear: 2003 },
+  { buildingId: "gwangju", buildingName: "광주회관", region: "광주", zone: "서구_상무", grossArea: 24200, builtYear: 2008 },
+] as const;
+
+/** 게이트 기준 — 표본 하한과 흩어짐 상한. */
+const FACTOR_MIN_SAMPLES = 5;
+const FACTOR_MAX_IQR_RATIO_PERCENT = 15;
+
+/** 연식 비교군 폭(준공연도 ± 이 값). */
+const AGE_BAND_YEARS = 5;
+
+/** numpy `np.percentile` 과 같은 선형보간 분위수. */
+function percentileOf(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  if (sorted.length === 1) return sorted[0];
+  const pos = (sorted.length - 1) * p;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+interface GroupStats {
+  count: number;
+  median: number;
+  q1: number;
+  q3: number;
+  iqr: number;
+  /** IQR ÷ 중앙값 × 100. 중앙값이 0이면 판정 불가라 무한대로 둔다. */
+  iqrRatioPercent: number;
+}
+
+function statsOf(group: BuildingMedian[]): GroupStats {
+  const rents = group.map((b) => b.buildingMedianRent).filter((r) => Number.isFinite(r));
+  const median = percentileOf(rents, 0.5);
+  const q1 = percentileOf(rents, 0.25);
+  const q3 = percentileOf(rents, 0.75);
+  return {
+    count: rents.length,
+    median,
+    q1,
+    q3,
+    iqr: q3 - q1,
+    iqrRatioPercent: median > 0 ? ((q3 - q1) / median) * 100 : Number.POSITIVE_INFINITY,
+  };
+}
+
 export function calculateAdjustmentFactors(
   buildingMedians: BuildingMedian[],
   datasetId: string
 ): CalculationResult[] {
-  const hallConfigs = [
-    {
-      buildingId: "dangsan",
-      buildingName: "당산회관",
-      region: "서울",
-      zone: "당산_문래",
-      grossArea: 23573.93,
-      builtYear: 2021,
-      currentContractRent: 13850,
-      baseRegionalRent: 14406,
-      zoneObs: 0.979,
-      sizeObs: 1.234,
-      ageObs: 0.982,
-      zoneCount: 90,
-      sizeCount: 36,
-      ageCount: 24,
-    },
-    {
-      buildingId: "yeongdeungpo",
-      buildingName: "영등포회관",
-      region: "서울",
-      zone: "영등포",
-      grossArea: 14476.76,
-      builtYear: 1988,
-      currentContractRent: 13850,
-      baseRegionalRent: 14406,
-      zoneObs: 1.025,
-      sizeObs: 1.000,
-      ageObs: 1.000,
-      zoneCount: 5,
-      sizeCount: 5,
-      ageCount: 0, // < 5 -> factor = 1.000
-      zoneReason: "영등포 권역·규모 결합 보정계수 1.025 적용 (표본 5건)",
-      sizeReason: "영등포 권역·규모 결합 반영 완료 (1.025)",
-      ageReason: "유사 연식 비교 매물이 없어 중립값 1.000 적용",
-    },
-    {
-      buildingId: "busan",
-      buildingName: "부산회관",
-      region: "부산",
-      zone: "중구_남포중앙동",
-      grossArea: 33148.77,
-      builtYear: 1989,
-      currentContractRent: 9459,
-      baseRegionalRent: 8925,
-      zoneObs: 0.960,
-      sizeObs: 1.425, // 관측치
-      ageObs: 1.000,
-      zoneCount: 124,
-      sizeCount: 4,  // < 5 -> factor = 1.000
-      ageCount: 0,   // < 5 -> factor = 1.000
-      sizeReason: "비교 매물이 4건으로 대표성이 부족하여 중립값 1.000 적용",
-      ageReason: "조건을 충족하는 비교 매물이 없음",
-    },
-    {
-      buildingId: "daegu",
-      buildingName: "대구회관",
-      region: "대구",
-      zone: "중구남구_도심",
-      grossArea: 22894.63,
-      builtYear: 2003,
-      currentContractRent: 5634,
-      baseRegionalRent: 9000,
-      zoneObs: 1.140,
-      sizeObs: 0.592,
-      ageObs: 1.583,
-      zoneCount: 116,
-      sizeCount: 21,
-      ageCount: 1,   // < 5 -> factor = 1.000
-      ageReason: "비교 매물이 1건으로 대표성을 확보하기 어려워 중립값 1.000 적용",
-    },
-    {
-      buildingId: "gwangju",
-      buildingName: "광주회관",
-      region: "광주",
-      zone: "서구_상무",
-      grossArea: 24200,
-      builtYear: 2008,
-      currentContractRent: 7077,
-      baseRegionalRent: 7485,
-      zoneObs: 1.236,
-      sizeObs: 1.031,
-      ageObs: 1.000,
-      zoneCount: 79,
-      sizeCount: 23,
-      ageCount: 23,
-    },
-  ];
+  const actualContractRents = getActualContractStore();
 
-  return hallConfigs.map((cfg) => {
-    const hallSizeCategory = classifyBuildingSize(cfg.grossArea);
-    const baseRegionalRent = cfg.baseRegionalRent;
+  // 계산에 못 쓰는 행(단가 0·결측)은 처음부터 뺀다. 0 으로 남겨 두면 중앙값이
+  // 실제보다 낮게 잡힌다.
+  const usable = buildingMedians.filter(
+    (b) => Number.isFinite(b.buildingMedianRent) && b.buildingMedianRent > 0
+  );
 
-    // Helper for sample count check
-    const evalFactor = (obs: number, count: number, name: string, customReason?: string) => {
-      const isOk = count >= 5;
-      const rec = isOk ? obs : 1.000;
-      let reason = customReason;
-      if (!reason) {
-        reason = isOk
-          ? `관측 ${name} 보정계수 ${obs.toFixed(3)} 반영 (표본 ${count}건)`
-          : `비교 매물이 ${count}건으로 대표성이 부족하여 중립값 1.000 적용`;
+  return HALL_SPECS.map((hall) => {
+    const hallSizeCategory = classifyBuildingSize(hall.grossArea);
+    const regionGroup = usable.filter((b) => b.region === hall.region);
+    const regionStats = statsOf(regionGroup);
+    const baseRegionalRent = Math.round(regionStats.median);
+
+    // ① 권역 — 권역 건물이 없으면 지역군을 그대로 쓴다(계수 1.000 이 된다).
+    const zoneMatch = regionGroup.filter((b) => b.zone === hall.zone);
+    const zoneGroup = zoneMatch.length > 0 ? zoneMatch : regionGroup;
+
+    // ② 규모 — 연면적이 없는 건물은 규모군에 넣지 않는다(0 으로 세면 안 된다).
+    const sizeMatch = zoneGroup.filter(
+      (b) => classifyBuildingSize(b.grossArea) === hallSizeCategory
+    );
+    const sizeGroup = sizeMatch.length > 0 ? sizeMatch : zoneGroup;
+
+    // ③ 연식 — 준공연도가 없는 건물은 연식군에 넣지 않는다.
+    const ageMatch = sizeGroup.filter(
+      (b) =>
+        Number.isFinite(b.completionYear) &&
+        b.completionYear > 0 &&
+        Math.abs(b.completionYear - hall.builtYear) <= AGE_BAND_YEARS
+    );
+    const ageGroup = ageMatch.length > 0 ? ageMatch : sizeGroup;
+
+    const zoneStats = statsOf(zoneGroup);
+    const sizeStats = statsOf(sizeGroup);
+    const ageStats = statsOf(ageGroup);
+
+    const buildFactor = (
+      name: string,
+      base: GroupStats,
+      target: GroupStats,
+      extra: Partial<FactorDetail>
+    ): FactorDetail => {
+      const observedFactor =
+        base.median > 0 && target.median > 0
+          ? Number((target.median / base.median).toFixed(3))
+          : 1.0;
+
+      const enoughSamples = target.count >= FACTOR_MIN_SAMPLES;
+      const tightEnough = target.iqrRatioPercent <= FACTOR_MAX_IQR_RATIO_PERCENT;
+      const passesGate = enoughSamples && tightEnough;
+
+      const recommendedFactor = passesGate ? observedFactor : 1.0;
+      const isApplied = passesGate && observedFactor !== 1.0;
+
+      let reason: string;
+      if (target.count === 0) {
+        reason = "비교 건물이 없어 중립값 1.000 적용";
+      } else if (!enoughSamples) {
+        reason = `비교 건물이 ${target.count}건으로 대표성이 부족하여 중립값 1.000 적용 (기준 ${FACTOR_MIN_SAMPLES}건)`;
+      } else if (!tightEnough) {
+        reason = `비교 건물 ${target.count}건의 단가 흩어짐(IQR ${target.iqrRatioPercent.toFixed(1)}%)이 기준 ${FACTOR_MAX_IQR_RATIO_PERCENT}%를 넘어 중립값 1.000 적용`;
+      } else if (!isApplied) {
+        reason = `관측 ${name} 보정계수가 1.000 이라 조정 없음 (표본 ${target.count}건)`;
+      } else {
+        reason = `관측 ${name} 보정계수 ${observedFactor.toFixed(3)} 반영 (표본 ${target.count}건, IQR ${target.iqrRatioPercent.toFixed(1)}%)`;
       }
+
+      const appliedStatus: "적용" | "미적용" = isApplied ? "적용" : "미적용";
+
       return {
-        observedFactor: obs,
-        recommendedFactor: rec,
-        appliedFactor: rec,
-        sampleCount: count,
-        isApplied: isOk && obs !== 1.000,
-        appliedStatus: (isOk && obs !== 1.000) ? ("적용" as const) : ("미적용" as const),
+        observedFactor,
+        recommendedFactor,
+        appliedFactor: recommendedFactor,
+        sampleCount: target.count,
+        q1: Math.round(target.q1),
+        q3: Math.round(target.q3),
+        iqrAmount: Math.round(target.iqr),
+        iqrRatioPercent: Number.isFinite(target.iqrRatioPercent)
+          ? Number(target.iqrRatioPercent.toFixed(1))
+          : 0,
+        isApplied,
+        appliedStatus,
         reason,
+        baseGroupCount: base.count,
+        baseGroupMedian: Math.round(base.median),
+        targetGroupCount: target.count,
+        targetGroupMedian: Math.round(target.median),
+        formulaDescription: `${Math.round(target.median).toLocaleString()} ÷ ${Math.round(base.median).toLocaleString()} = ${observedFactor.toFixed(3)}`,
+        recommendationJudgment: `${appliedStatus} (${reason})`,
+        ...extra,
       };
     };
 
-    const zEval = evalFactor(cfg.zoneObs, cfg.zoneCount, "권역", cfg.zoneReason);
-    const sEval = evalFactor(cfg.sizeObs, cfg.sizeCount, "규모", cfg.sizeReason);
-    const aEval = evalFactor(cfg.ageObs, cfg.ageCount, "연식", cfg.ageReason);
-
-    const zoneTargetMed = Math.round(baseRegionalRent * cfg.zoneObs);
-    const sizeTargetMed = Math.round(zoneTargetMed * cfg.sizeObs);
-    const ageTargetMed = Math.round(sizeTargetMed * cfg.ageObs);
-
-    const zoneFactorDetail = {
-      ...zEval,
-      q1: Math.round(zoneTargetMed * 0.95),
-      q3: Math.round(zoneTargetMed * 1.05),
-      iqrAmount: Math.round(zoneTargetMed * 0.1),
-      iqrRatioPercent: 8.5,
-      baseGroupCount: 300,
-      baseGroupMedian: baseRegionalRent,
-      targetGroupCount: cfg.zoneCount,
-      targetGroupMedian: zoneTargetMed,
-      formulaDescription: `권역 관측단가 / 지역대표단가 = ${cfg.zoneObs.toFixed(3)}`,
-      recommendationJudgment: `${zEval.appliedStatus} (${zEval.reason})`,
-    };
-
-    const sizeFactorDetail = {
-      ...sEval,
-      q1: Math.round(sizeTargetMed * 0.95),
-      q3: Math.round(sizeTargetMed * 1.05),
-      iqrAmount: Math.round(sizeTargetMed * 0.1),
-      iqrRatioPercent: 9.2,
-      hallGrossAreaSqm: cfg.grossArea,
+    const zoneFactorDetail = buildFactor("권역", regionStats, zoneStats, {});
+    const sizeFactorDetail = buildFactor("규모", zoneStats, sizeStats, {
+      hallGrossAreaSqm: hall.grossArea,
       hallSizeCategory,
-      baseGroupCount: cfg.zoneCount,
-      baseGroupMedian: zoneTargetMed,
-      targetGroupCount: cfg.sizeCount,
-      targetGroupMedian: sizeTargetMed,
-      formulaDescription: `규모 관측단가 / 권역단가 = ${cfg.sizeObs.toFixed(3)}`,
-      recommendationJudgment: `${sEval.appliedStatus} (${sEval.reason})`,
-    };
+    });
+    const ageFactorDetail = buildFactor("연식", sizeStats, ageStats, {
+      hallBuiltYear: hall.builtYear,
+      ageRangeStr: `${hall.builtYear - AGE_BAND_YEARS}~${hall.builtYear + AGE_BAND_YEARS}년 준공`,
+    });
 
-    const ageFactorDetail = {
-      ...aEval,
-      q1: Math.round(ageTargetMed * 0.95),
-      q3: Math.round(ageTargetMed * 1.05),
-      iqrAmount: Math.round(ageTargetMed * 0.1),
-      iqrRatioPercent: 11.0,
-      hallBuiltYear: cfg.builtYear,
-      ageRangeStr: `${cfg.builtYear - 5}~${cfg.builtYear + 5}년 준공`,
-      baseGroupCount: cfg.sizeCount,
-      baseGroupMedian: sizeTargetMed,
-      targetGroupCount: cfg.ageCount,
-      targetGroupMedian: ageTargetMed,
-      formulaDescription: `연식 관측단가 / 규모단가 = ${cfg.ageObs.toFixed(3)}`,
-      recommendationJudgment: `${aEval.appliedStatus} (${aEval.reason})`,
-    };
+    const obsTotal = Number(
+      (
+        zoneFactorDetail.observedFactor *
+        sizeFactorDetail.observedFactor *
+        ageFactorDetail.observedFactor
+      ).toFixed(3)
+    );
+    const recTotal = Number(
+      (
+        zoneFactorDetail.recommendedFactor *
+        sizeFactorDetail.recommendedFactor *
+        ageFactorDetail.recommendedFactor
+      ).toFixed(3)
+    );
 
-    const obsTotal = Number((cfg.zoneObs * cfg.sizeObs * cfg.ageObs).toFixed(3));
-    const recTotal = Number((zEval.recommendedFactor * sEval.recommendedFactor * aEval.recommendedFactor).toFixed(3));
+    const now = new Date().toISOString();
 
     return {
       datasetId,
-      buildingId: cfg.buildingId,
-      buildingName: cfg.buildingName,
-      region: cfg.region,
-      zone: cfg.zone,
+      buildingId: hall.buildingId,
+      buildingName: hall.buildingName,
+      region: hall.region,
+      zone: hall.zone,
       baseRegionalRent,
-      currentContractRent: cfg.currentContractRent,
-      observedFactors: { zone: cfg.zoneObs, size: cfg.sizeObs, age: cfg.ageObs, total: obsTotal },
-      recommendedFactors: { zone: zEval.recommendedFactor, size: sEval.recommendedFactor, age: aEval.recommendedFactor, total: recTotal },
-      appliedFactors: { zone: zEval.recommendedFactor, size: sEval.recommendedFactor, age: aEval.recommendedFactor, total: recTotal },
+      currentContractRent: actualContractRents[hall.buildingId] ?? 0,
+      observedFactors: {
+        zone: zoneFactorDetail.observedFactor,
+        size: sizeFactorDetail.observedFactor,
+        age: ageFactorDetail.observedFactor,
+        total: obsTotal,
+      },
+      recommendedFactors: {
+        zone: zoneFactorDetail.recommendedFactor,
+        size: sizeFactorDetail.recommendedFactor,
+        age: ageFactorDetail.recommendedFactor,
+        total: recTotal,
+      },
+      appliedFactors: {
+        zone: zoneFactorDetail.appliedFactor,
+        size: sizeFactorDetail.appliedFactor,
+        age: ageFactorDetail.appliedFactor,
+        total: recTotal,
+      },
       zoneFactorDetail,
       sizeFactorDetail,
       ageFactorDetail,
       recommendedRent: Math.round(baseRegionalRent * recTotal),
       finalRent: Math.round(baseRegionalRent * recTotal),
-      calculationTimestamp: new Date().toISOString(),
-      calculatedAt: new Date().toISOString(),
+      calculatedAt: now,
       calculationVersion: "v2.0",
       formulaVersion: "RS-2026Q2",
     };
