@@ -6,8 +6,8 @@
 import { useState, useEffect } from "react";
 import { ConfirmedValuation, DatasetMetadata } from "../types/dataset";
 import { datasetRepository, valuationRepository } from "../db/repository";
-import { clearAllHistoryDatabase, reseedStandardHistoryDatabase, deleteDatasetsByIds } from "../db/idb";
-import { History, Search, Calendar, CheckCircle2, Eye, X, Trash2, RefreshCw, CheckSquare, Square } from "lucide-react";
+import { clearAllHistoryDatabase, deleteDatasetsByIds } from "../db/idb";
+import { History, Search, Calendar, CheckCircle2, Eye, X, Trash2, CheckSquare, Square } from "lucide-react";
 
 export function QuarterlyHistoryView() {
   const [datasets, setDatasets] = useState<DatasetMetadata[]>([]);
@@ -107,23 +107,6 @@ export function QuarterlyHistoryView() {
     }
   };
 
-  const handleReseedStandardHistory = async () => {
-    if (!window.confirm("2025년 2~4분기 및 2026년 1분기의 지정 임대기준가격표(당산 14000, 영등포 12700, 부산 8570, 대구 5200, 광주 6200)로 이력을 재구성하시겠습니까?")) {
-      return;
-    }
-    setIsLoading(true);
-    try {
-      await reseedStandardHistoryDatabase();
-      await loadHistory();
-      alert("2025년 2분기 ~ 2026년 1분기 기준 임대가격표 데이터셋 이력이 재구성되었습니다.");
-    } catch (err) {
-      console.error(err);
-      alert("데이터 재구성 중 오류가 발생했습니다.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const modalValuations = confirmedValuations.filter(
     (v) => v.datasetId === selectedHistoryModalDataset
   );
@@ -161,14 +144,6 @@ export function QuarterlyHistoryView() {
           >
             <Trash2 className="w-3.5 h-3.5" />
             이력 데이터 전체 삭제
-          </button>
-
-          <button
-            onClick={handleReseedStandardHistory}
-            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-xs"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            2025Q2~2026Q1 표준이력 설정
           </button>
         </div>
       </div>

@@ -6,7 +6,6 @@
 import { useState, useEffect } from "react";
 import { DatasetMetadata } from "./types/dataset";
 import { MainMenuId, SubMenuId, mainNavigation } from "./types/navigation";
-import { seedInitialDatabaseIfEmpty } from "./db/idb";
 import { datasetRepository } from "./db/repository";
 
 // Components
@@ -110,7 +109,6 @@ export default function App() {
   const initApp = async () => {
     setIsInitializing(true);
     try {
-      await seedInitialDatabaseIfEmpty();
       const dsList = await datasetRepository.listDatasets();
       setDatasets(dsList);
       if (dsList.length > 0) {

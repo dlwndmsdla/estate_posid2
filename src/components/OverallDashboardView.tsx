@@ -186,10 +186,14 @@ export function OverallDashboardView({
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-1">
           <span className="text-[11px] font-bold text-slate-400 block">조회 분기 데이터셋</span>
           <div className="flex items-center justify-between">
-            <span className="text-lg font-black font-mono text-indigo-700">{selectedDatasetId}</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold font-mono">
-              CONFIRMED
+            <span className="text-lg font-black font-mono text-indigo-700">
+              {dataset ? selectedDatasetId : "데이터 없음"}
             </span>
+            {dataset && (
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold font-mono uppercase">
+                {dataset.status}
+              </span>
+            )}
           </div>
           <span className="text-[11px] text-slate-500 block truncate">
             {dataset ? `${dataset.referenceYear}년 ${dataset.referenceQuarter}분기 V${dataset.version}` : "2026년 2분기"}
