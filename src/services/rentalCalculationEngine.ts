@@ -765,25 +765,6 @@ export function calculateHallComparison(
   efficiencyTable: EfficiencyRateTable,
   convertedListings: RegionalConvertedListing[]
 ): HallComparisonRow[] {
-  // User's exact manually verified median values for regional & zone listing converted medians:
-  // 서울회관: 14,213 | 10,201
-  // 부산회관: 9,468 | 8,078
-  // 대구회관: 9,384 | 9,838
-  // 광주회관: 7,914 | 8,804
-  const userRegionalListingMedians: Record<string, number> = {
-    서울회관: 14406,
-    부산회관: 9468,
-    대구회관: 9384,
-    광주회관: 7914,
-  };
-
-  const userZoneListingMedians: Record<string, number> = {
-    서울회관: 10201,
-    부산회관: 8078,
-    대구회관: 9838,
-    광주회관: 8804,
-  };
-
   const halls = [
     {
       hallName: "서울회관",
@@ -832,11 +813,26 @@ export function calculateHallComparison(
     const contractByRegion = Math.round(h.exclusiveRentWon * regRate);
     const contractByZone = Math.round(h.exclusiveRentWon * zoneRate);
 
-    const regionListingsMedianRentWon = userRegionalListingMedians[h.hallName] ?? 10000;
-    const zoneListingsMedianRentWon = userZoneListingMedians[h.hallName] ?? 10000;
+    // 업로드된 매물에서 직접 집계한다. 예전엔 회관별 중앙값이 상수로 박혀 있어
+    // 어떤 파일을 올려도 이 표가 같은 숫자를 보여 줬다.
+    const regionListings = convertedListings.filter((c) => c.region === h.region);
+    const zoneListings = convertedListings.filter(
+      (c) => c.region === h.region && c.zone === h.zone
+    );
 
-    const regionExclMedianRentWon = Math.round(regionListingsMedianRentWon / (regRate || 0.573));
-    const zoneExclMedianRentWon = Math.round(zoneListingsMedianRentWon / (zoneRate || 0.506));
+    const regionExclMedianRentWon = Math.round(
+      calculateMedian(regionListings.map((c) => c.rentPerExclusiveSqmWon))
+    );
+    const zoneExclMedianRentWon = Math.round(
+      calculateMedian(zoneListings.map((c) => c.rentPerExclusiveSqmWon))
+    );
+
+    const regionListingsMedianRentWon = Math.round(
+      calculateMedian(regionListings.map((c) => c.rentPerContractSqmByRegionWon))
+    );
+    const zoneListingsMedianRentWon = Math.round(
+      calculateMedian(zoneListings.map((c) => c.rentPerContractSqmByZoneWon))
+    );
 
     return {
       hallName: h.hallName,

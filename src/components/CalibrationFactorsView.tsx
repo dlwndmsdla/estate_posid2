@@ -6,7 +6,6 @@
 import { useState, useEffect } from "react";
 import { CalculationResult, DatasetMetadata } from "../types/dataset";
 import { valuationRepository, datasetRepository } from "../db/repository";
-import { activeBuildingsInfo } from "../prdDataset";
 import { Sliders, Building2, CheckCircle2, RotateCcw, Info } from "lucide-react";
 
 interface CalibrationFactorsViewProps {
@@ -68,28 +67,12 @@ export function CalibrationFactorsView({ selectedDatasetId }: CalibrationFactors
                   </td>
                 </tr>
               ) : calcs.length === 0 ? (
-                activeBuildingsInfo.map((b) => {
-                  const basePrice = b.id === "busan" ? 8926 : b.id === "daegu" ? 9001 : b.id === "gwangju" ? 7485 : 14406;
-                  const recZone = b.id === "gwangju" ? 1.169 : b.id === "busan" ? 0.904 : b.id === "daegu" ? 1.052 : 1.105;
-                  const recSize = b.id === "busan" ? 1.147 : b.id === "daegu" ? 1.013 : b.id === "gwangju" ? 0.936 : 0.832;
-                  const recAge = b.id === "busan" ? 0.906 : b.id === "daegu" ? 0.816 : b.id === "gwangju" ? 1.000 : 0.349;
-                  const total = Number((recZone * recSize * recAge).toFixed(3));
-                  const finalPrice = Math.round(basePrice * total);
-                  return (
-                    <tr key={b.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3.5">
-                        <div className="font-bold text-slate-800">{b.name}</div>
-                        <div className="text-[11px] text-slate-400">{b.city} • {b.tradeArea}</div>
-                      </td>
-                      <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-800">{basePrice.toLocaleString()} 원/㎡</td>
-                      <td className="px-4 py-3.5 text-center font-mono font-bold text-indigo-600">{recZone.toFixed(3)}</td>
-                      <td className="px-4 py-3.5 text-center font-mono font-bold text-emerald-600">{recSize.toFixed(3)}</td>
-                      <td className="px-4 py-3.5 text-center font-mono font-bold text-amber-600">{recAge.toFixed(3)}</td>
-                      <td className="px-4 py-3.5 text-center font-mono font-black text-slate-900">{total.toFixed(3)}</td>
-                      <td className="px-4 py-3.5 text-right font-mono font-bold text-indigo-900">{finalPrice.toLocaleString()} 원/㎡</td>
-                    </tr>
-                  );
-                })
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
+                    산정을 실행한 데이터셋이 없습니다. 매물 파일을 업로드한 뒤
+                    산정을 실행하면 이 표가 채워집니다.
+                  </td>
+                </tr>
               ) : (
                 calcs.map((item) => (
                   <tr key={item.buildingId} className="hover:bg-slate-50">
