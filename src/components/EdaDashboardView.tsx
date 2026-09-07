@@ -744,7 +744,7 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
         {/* Built Year vs Rent */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
           <h3 className="font-bold text-slate-800 text-sm">4. 준공연도(건물 연식) vs 임대료</h3>
-          <p className="text-[11px] text-slate-500">신축 건물일수록 임대료가 높게 형성되는 연식 보정 원리 검증</p>
+          <p className="text-[11px] text-slate-500">준공연도와 단가의 관계. 연식 보정계수가 기대하는 방향이 이번 분기에도 맞는지 아래 줄에서 확인한다</p>
 
           <div className="h-56 w-full pt-1">
             <ResponsiveContainer width="100%" height="100%">
@@ -772,7 +772,7 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
         {/* Subway Distance vs Rent */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
           <h3 className="font-bold text-slate-800 text-sm">5. 지하철역 거리(m) vs 임대료</h3>
-          <p className="text-[11px] text-slate-500">지하철역 접근성이 우수할수록(거리 짧을수록) 임대료 상승 경향</p>
+          <p className="text-[11px] text-slate-500">역 거리와 단가의 관계. 가까울수록 비싸다고 단정하지 않는다 — 이번 분기 표본이 어느 쪽인지 아래 줄에 적는다</p>
 
           <div className="h-56 w-full pt-1">
             <ResponsiveContainer width="100%" height="100%">
