@@ -246,7 +246,7 @@ export default function App() {
           )}
 
           {activeSubMenu === "conversion" && <ConversionSubView />}
-          {activeSubMenu === "comparables" && <ComparableListingsSubView />}
+          {activeSubMenu === "comparables" && <ComparableListingsSubView selectedDatasetId={selectedDatasetId} />}
 
           {activeSubMenu === "dashboard" && (
             <OverallDashboardView
