@@ -284,6 +284,73 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
     return { listCount, bldgCount, medianUnit, medianArea };
   }, [filteredListings, filteredBuildingMedians]);
 
+  /**
+   * 차트 밑에 붙는 한 줄 해석.
+   *
+   * 예전에는 "연면적 우상향 곡선이 확인됩니다", "2010년 이후 신축 프리미엄 확인",
+   * "역세권 300m 이내 고단가 집중 형성" 처럼 결론이 고정 문구로 박혀 있었다.
+   * 데이터가 0건이어도 그대로 떴고, 실제 표본이 반대 방향이어도 같은 문장이었다.
+   * 이제 이번 분기 표본에서 직접 계산하고, 판단할 만큼 없으면 없다고 적는다.
+   */
+  const chartNotes = useMemo(() => {
+    const med = (arr: number[]) => {
+      if (arr.length === 0) return 0;
+      const s = [...arr].sort((a, b) => a - b);
+      return s[Math.floor(s.length / 2)];
+    };
+
+    /** 두 무리의 중앙 단가를 견준다. 한쪽이 5건 미만이면 판단하지 않는다. */
+    const compare = (
+      hi: number[],
+      lo: number[],
+      hiName: string,
+      loName: string
+    ): string | null => {
+      if (hi.length < 5 || lo.length < 5) return null;
+      const h = med(hi);
+      const l = med(lo);
+      if (h <= 0 || l <= 0) return null;
+      const pct = ((h / l - 1) * 100).toFixed(0);
+      const dir = h >= l ? "높다" : "낮다";
+      return `${hiName} 중앙 ${h.toLocaleString()}원 · ${loName} ${l.toLocaleString()}원 — ${Math.abs(Number(pct))}% ${dir} (각 ${hi.length}건 / ${lo.length}건)`;
+    };
+
+    // 1. 연면적 — 상·하위 25% 를 견준다
+    const withArea = filteredListings.filter((x) => x.area > 0);
+    const areas = withArea.map((x) => x.area).sort((a, b) => a - b);
+    let areaNote: string | null = null;
+    if (areas.length >= 20) {
+      const q1 = areas[Math.floor(areas.length * 0.25)];
+      const q3 = areas[Math.floor(areas.length * 0.75)];
+      areaNote = compare(
+        withArea.filter((x) => x.area >= q3).map((x) => x.unit),
+        withArea.filter((x) => x.area <= q1).map((x) => x.unit),
+        `연면적 상위 25%(${Math.round(q3).toLocaleString()}㎡ 이상)`,
+        `하위 25%(${Math.round(q1).toLocaleString()}㎡ 이하)`
+      );
+    }
+
+    // 3. 연식 — 2010년 기준
+    const withYear = filteredListings.filter((x) => x.year && x.year > 1900);
+    const yearNote = compare(
+      withYear.filter((x) => (x.year as number) >= 2010).map((x) => x.unit),
+      withYear.filter((x) => (x.year as number) < 2010).map((x) => x.unit),
+      "2010년 이후 준공",
+      "그 이전"
+    );
+
+    // 4. 지하철 거리 — 300m 기준
+    const withSubway = filteredListings.filter((x) => x.subway && x.subway > 0);
+    const subwayNote = compare(
+      withSubway.filter((x) => (x.subway as number) <= 300).map((x) => x.unit),
+      withSubway.filter((x) => (x.subway as number) > 300).map((x) => x.unit),
+      "역 300m 이내",
+      "300m 초과"
+    );
+
+    return { areaNote, yearNote, subwayNote };
+  }, [filteredListings]);
+
   // Use Mix Donut Data
   const useMixData = useMemo(() => {
     const rsquareMap: Record<string, number> = {};
@@ -579,7 +646,9 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
             </ResponsiveContainer>
           </div>
           <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-600">
-            <strong>EDA 해석:</strong> 대형 오피스일수록 단위당 임대료가 상승하는 연면적 우상향 곡선이 확인됩니다. 회관(★)은 각 지역 대형군 상단/중앙 위치에 배치되어 있습니다.
+            <strong>이번 분기 표본:</strong>{" "}
+            {chartNotes.areaNote ??
+              "연면적이 있는 매물이 20건 미만이라 규모별 차이를 판단하지 않습니다."}
           </div>
         </div>
 
@@ -630,7 +699,10 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
             </ResponsiveContainer>
           </div>
           <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-600">
-            <strong>EDA 해석:</strong> 빌딩 단위로 중앙값을 산출함으로써 다수 매물이 등록된 특정 건물의 통계 착시 및 이상치 왜곡이 제거됩니다.
+            <strong>이번 분기 표본:</strong> 매물 {filteredListings.length.toLocaleString()}건이
+            건물 {filteredBuildingMedians.length.toLocaleString()}개동으로 묶였습니다. 한 건물에 매물이
+            여러 개 올라와 있으면 그 건물이 통계에서 여러 번 세어지므로, 건물마다 중앙값 하나로 줄인 뒤
+            산정에 씁니다.
           </div>
         </div>
       </div>
@@ -664,7 +736,8 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
             </ResponsiveContainer>
           </div>
           <div className="text-[11px] text-slate-500 text-center font-bold">
-            알스퀘어 업무시설 적합도 우수 (보정 원천 데이터 우선채택)
+            전용률 표본은 알스퀘어에서만 뽑는다 — 네모는 임대(계약)면적을 주지 않아
+            매물 고유 전용률을 구할 수 없다.
           </div>
         </div>
 
@@ -692,7 +765,7 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
             </ResponsiveContainer>
           </div>
           <div className="text-[11px] text-slate-500 text-center font-medium">
-            2010년 이후 준공 신축 오피스의 단가 프리미엄 확인
+            {chartNotes.yearNote ?? "준공연도가 있는 매물이 적어 연식별 차이를 판단하지 않습니다."}
           </div>
         </div>
 
@@ -719,7 +792,7 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
             </ResponsiveContainer>
           </div>
           <div className="text-[11px] text-slate-500 text-center font-medium">
-            역세권 300m 이내 고단가 집중 형성
+            {chartNotes.subwayNote ?? "역 거리가 있는 매물이 적어 접근성별 차이를 판단하지 않습니다."}
           </div>
         </div>
       </div>
