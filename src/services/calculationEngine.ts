@@ -11,7 +11,6 @@ import {
   QuarterComparison,
   ConfirmedValuation,
 } from "../types/dataset";
-import { activeBuildingsInfo } from "../prdDataset";
 import { calculateAdjustmentFactors } from "./rentalCalculationEngine";
 
 /**
