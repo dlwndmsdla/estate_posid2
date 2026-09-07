@@ -303,8 +303,10 @@ export function ConversionSubView() {
                   3순위 (폴백)
                 </span>
                 <h4 className="font-bold text-white text-sm">지역별/전국 중앙값</h4>
+                {/* 62.0% 로 적혀 있었다. 분기마다 달라지는 값이라 표에서 읽는다. */}
                 <p className="text-slate-300 text-[11px] leading-relaxed">
-                  권역 표본이 5건 미만인 경우, 해당 광역 지역 중앙값 또는 전국 표준 전용률(62.0%)을 차순위 적용합니다.
+                  권역 표본이 5건 미만인 경우, 해당 광역 지역 중앙값 또는 전국 중앙값
+                  ({(efficiencyTable.overallMedian * 100).toFixed(1)}%)을 차순위 적용합니다.
                 </p>
               </div>
             </div>
