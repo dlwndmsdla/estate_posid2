@@ -12,6 +12,7 @@ import {
   saveActualContractRent,
   saveBatchActualContractRents,
   calculateConversionFactor,
+  DEFAULT_PREV_BASELINES,
 } from "../../services/actualContractStore";
 import {
   Building2,
@@ -29,13 +30,8 @@ interface BuildingSummarySubViewProps {
   selectedDatasetId: string;
 }
 
-const FIXED_BASELINES_2026Q1: Record<string, number> = {
-  dangsan: 14000,
-  yeongdeungpo: 12700,
-  busan: 8570,
-  daegu: 5200,
-  gwangju: 6200,
-};
+// 지정 임대기준가는 actualContractStore 가 유일한 출처다.
+const FIXED_BASELINES_2026Q1 = DEFAULT_PREV_BASELINES;
 
 export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySubViewProps) {
   const [calcs, setCalcs] = useState<CalculationResult[]>([]);
@@ -93,7 +89,7 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
           }
         }
         if (rent === null || (refYear <= 2026 && refQuarter <= 2)) {
-          rent = FIXED_BASELINES_2026Q1[b.id] ?? 10000;
+          rent = FIXED_BASELINES_2026Q1[b.id] ?? 0;
         }
         prevMap[b.id] = rent;
       }
@@ -186,11 +182,11 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
           const calc = calcs.find((c) => c.buildingId === b.id);
           const conf = confirmedList.find((c) => c.buildingId === b.id);
 
-          const baseRent = calc ? calc.baseRegionalRent : FIXED_BASELINES_2026Q1[b.id] ?? 10000;
+          const baseRent = calc ? calc.baseRegionalRent : FIXED_BASELINES_2026Q1[b.id] ?? 0;
           const aiRent = calc ? calc.recommendedRent : baseRent;
           const finalRent = conf ? conf.finalRent : calc ? calc.finalRent : aiRent;
 
-          const prevRent = prevQuarterRents[b.id] ?? FIXED_BASELINES_2026Q1[b.id] ?? 10000;
+          const prevRent = prevQuarterRents[b.id] ?? FIXED_BASELINES_2026Q1[b.id] ?? 0;
           const actualRent = actualRents[b.id] ?? Math.round(prevRent * 0.95);
 
           const { factor, percentage } = calculateConversionFactor(actualRent, prevRent);
@@ -345,7 +341,7 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
 
             <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
               {activeBuildingsInfo.map((b) => {
-                const prevRent = prevQuarterRents[b.id] ?? FIXED_BASELINES_2026Q1[b.id] ?? 10000;
+                const prevRent = prevQuarterRents[b.id] ?? FIXED_BASELINES_2026Q1[b.id] ?? 0;
                 const currentVal = editForm[b.id] ?? Math.round(prevRent * 0.95);
                 const { factor, percentage } = calculateConversionFactor(currentVal, prevRent);
 

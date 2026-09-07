@@ -13,8 +13,15 @@ export interface ActualContractData {
 
 const STORAGE_KEY = "opm_actual_contract_rents_v2";
 
-// Standard default baselines for previous quarter (2026-Q1)
-const DEFAULT_PREV_BASELINES: Record<string, number> = {
+/**
+ * 회관별 지정 임대기준가(2026-Q1). 회관이 실제로 받고 있는 현행 임대료라
+ * 계산 결과가 아니라 주어진 사실이다.
+ *
+ * 같은 다섯 숫자가 BuildingCalculationView · BuildingSummarySubView ·
+ * QuarterComparisonSubView 에도 각각 복사돼 있었다. 네 벌이면 한 곳만 고쳐지고
+ * 나머지는 남는다. 이 파일이 유일한 출처다 — 화면에서 다시 적지 말 것.
+ */
+export const DEFAULT_PREV_BASELINES: Record<string, number> = {
   dangsan: 14000,
   yeongdeungpo: 12700,
   busan: 8570,
@@ -22,7 +29,10 @@ const DEFAULT_PREV_BASELINES: Record<string, number> = {
   gwangju: 6200,
 };
 
-// Default actual contract rents (~95% of baseline)
+/**
+ * 실거래 임대료(2025.4Q 부서 조사표). 담당자가 1단계 화면에서 고칠 수 있고
+ * 고친 값은 localStorage 에 남는다. 지역 단위 조사값이라 서울 두 회관은 같다.
+ */
 const DEFAULT_ACTUAL_CONTRACT_RENTS: Record<string, number> = {
   dangsan: 13487,
   yeongdeungpo: 13487,
@@ -69,7 +79,8 @@ export function saveBatchActualContractRents(data: Record<string, number>): void
 }
 
 export function getDefaultPrevBaseline(buildingId: string): number {
-  return DEFAULT_PREV_BASELINES[buildingId] ?? 10000;
+  // 없는 회관이면 0. 예전에는 10,000 원을 돌려줘 근거 없는 값이 화면에 찍혔다.
+  return DEFAULT_PREV_BASELINES[buildingId] ?? 0;
 }
 
 export function calculateConversionFactor(actualRent: number, baselineRent: number): {

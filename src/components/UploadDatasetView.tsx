@@ -372,7 +372,8 @@ export function UploadDatasetView({
             </p>
             <div className="space-y-1.5">
               {activeBuildingsInfo.map((b) => {
-                const val = actualContractRents[b.id] ?? 10000;
+                // 조사표에 없는 회관이면 0. 10,000 원을 넣으면 담당자가 입력한 값처럼 보인다.
+                const val = actualContractRents[b.id] ?? 0;
                 return (
                   <div key={b.id} className="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/80 text-xs shadow-2xs">
                     <span className="font-bold text-slate-700 text-xs flex items-center gap-1">

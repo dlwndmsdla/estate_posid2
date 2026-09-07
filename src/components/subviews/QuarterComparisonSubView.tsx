@@ -11,6 +11,7 @@ import {
   getActualContractStore,
   saveActualContractRent,
   calculateConversionFactor,
+  DEFAULT_PREV_BASELINES,
 } from "../../services/actualContractStore";
 import {
   Calendar,
@@ -28,13 +29,8 @@ interface QuarterComparisonSubViewProps {
   selectedDatasetId: string;
 }
 
-const FIXED_BASELINES: Record<string, number> = {
-  dangsan: 14000,
-  yeongdeungpo: 12700,
-  busan: 8570,
-  daegu: 5200,
-  gwangju: 6200,
-};
+// 지정 임대기준가는 actualContractStore 가 유일한 출처다.
+const FIXED_BASELINES = DEFAULT_PREV_BASELINES;
 
 export function QuarterComparisonSubView({ selectedDatasetId }: QuarterComparisonSubViewProps) {
   const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
@@ -87,7 +83,7 @@ export function QuarterComparisonSubView({ selectedDatasetId }: QuarterCompariso
       for (const b of activeBuildingsInfo) {
         const conf = confs.find((c) => c.buildingId === b.id);
         const calc = calcs.find((c) => c.buildingId === b.id);
-        const currentRent = conf ? conf.finalRent : calc ? calc.finalRent : FIXED_BASELINES[b.id] ?? 10000;
+        const currentRent = conf ? conf.finalRent : calc ? calc.finalRent : FIXED_BASELINES[b.id] ?? 0;
 
         // Previous quarter baseline
         let prevRent: number | null = null;
@@ -100,10 +96,10 @@ export function QuarterComparisonSubView({ selectedDatasetId }: QuarterCompariso
           }
         }
         if (prevRent === null || (refYear <= 2026 && refQuarter <= 2)) {
-          prevRent = FIXED_BASELINES[b.id] ?? 10000;
+          prevRent = FIXED_BASELINES[b.id] ?? 0;
         }
 
-        const base2026Q1 = FIXED_BASELINES[b.id] ?? 10000;
+        const base2026Q1 = FIXED_BASELINES[b.id] ?? 0;
 
         const diffNum = currentRent - prevRent;
         const pctQoQ = prevRent > 0 ? ((diffNum / prevRent) * 100).toFixed(1) : "0.0";

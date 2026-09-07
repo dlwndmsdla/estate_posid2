@@ -25,6 +25,7 @@ import {
   getActualContractStore,
   saveActualContractRent,
   calculateConversionFactor,
+  DEFAULT_PREV_BASELINES,
 } from "../services/actualContractStore";
 import {
   Calculator,
@@ -75,7 +76,13 @@ export function BuildingCalculationView({
 
   useEffect(() => {
     const store = getActualContractStore();
-    const prevRent = store[selectedBuildingId] ?? Math.round((previousQuarterInfo?.finalRent || 14000) * 0.95);
+    // 저장값 → 지정 임대기준가 순. 예전에는 마지막에 당산 값 14,000 을 넣고 0.95 를
+    // 곱했는데, 어느 회관이든 당산 기준으로 지어낸 숫자가 들어가는 것이라 뺐다.
+    const prevRent =
+      store[selectedBuildingId] ??
+      previousQuarterInfo?.finalRent ??
+      DEFAULT_PREV_BASELINES[selectedBuildingId] ??
+      0;
     setActualContractRentInput(prevRent);
   }, [selectedBuildingId, previousQuarterInfo]);
 
@@ -143,14 +150,8 @@ export function BuildingCalculationView({
       const prevQuarter = refQuarter === 1 ? 4 : (refQuarter - 1 as 1 | 2 | 3 | 4);
       const prevQuarterLabel = `${prevYear}년 ${prevQuarter}분기`;
 
-      // Fixed designated baseline prices for 2026-1Q and earlier (2025Q2~2026Q1)
-      const FIXED_BASELINES: Record<string, number> = {
-        dangsan: 14000,
-        yeongdeungpo: 12700,
-        busan: 8570,
-        daegu: 5200,
-        gwangju: 6200,
-      };
+      // 지정 임대기준가는 actualContractStore 가 유일한 출처다.
+      const FIXED_BASELINES = DEFAULT_PREV_BASELINES;
 
       const allDatasets = await datasetRepository.listDatasets();
 
@@ -179,7 +180,7 @@ export function BuildingCalculationView({
 
       // For 2026-2Q target, previous quarter is 2026-1Q which must use the fixed designated price table
       if (prevRent === null || (refYear <= 2026 && refQuarter <= 2)) {
-        prevRent = FIXED_BASELINES[selectedBuildingId] ?? 10000;
+        prevRent = FIXED_BASELINES[selectedBuildingId] ?? 0;
         prevLabel = `${prevQuarterLabel} (지정 임대기준가)`;
       }
 
@@ -1093,7 +1094,8 @@ export function BuildingCalculationView({
 
                 {/* Our Building Contract Rent & Conversion Factor (Right below Age Slider) */}
                 {(() => {
-                  const prevBaselineRent = previousQuarterInfo?.finalRent || 14000;
+                  const prevBaselineRent =
+                    previousQuarterInfo?.finalRent ?? DEFAULT_PREV_BASELINES[selectedBuildingId] ?? 0;
                   const { factor, percentage } = calculateConversionFactor(
                     actualContractRentInput,
                     prevBaselineRent
