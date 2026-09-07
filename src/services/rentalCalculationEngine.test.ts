@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { calculateAdjustmentFactors } from "./rentalCalculationEngine";
+import { CALC_ENGINE_VERSION, calculateAdjustmentFactors } from "./rentalCalculationEngine";
 import type { BuildingMedian } from "../types/dataset";
 
 /** 테스트용 건물 중앙값 한 건. 계산에 쓰이는 5개 필드만 지정하면 된다. */
@@ -151,5 +151,12 @@ describe("calculateAdjustmentFactors — 업로드 데이터에서 산출", () =
     const expected = Math.round(r.baseRegionalRent * r.appliedFactors.total);
     expect(r.finalRent).toBe(expected);
     expect(r.recommendedRent).toBe(expected);
+  });
+
+  // 저장된 결과를 다시 계산할지 판단하는 근거가 이 도장이다(db/repository.ts).
+  // 도장이 안 찍히면 옛 엔진 산출이 영원히 갱신되지 않는다.
+  test("산정 결과에 현재 엔진 판이 찍힌다", () => {
+    const rows = [...Array(5)].map(() => bldg("서울", "당산_문래", 12000));
+    expect(당산(rows).calculationVersion).toBe(CALC_ENGINE_VERSION);
   });
 });

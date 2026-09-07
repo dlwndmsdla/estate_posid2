@@ -12,7 +12,6 @@ import {
   ConfirmedValuation,
   ColumnMappingRule,
 } from "../types/dataset";
-import { prdDataset, activeBuildingsInfo } from "../prdDataset";
 
 const DB_NAME = "RentBaselineDashboardDB";
 const DB_VERSION = 2;  // v2: 방법2 시트 저장소 추가

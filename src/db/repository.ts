@@ -14,6 +14,13 @@ import {
   Method2SheetData,
 } from "../types/dataset";
 import { openDatabase, STORES } from "./idb";
+import {
+  CALC_ENGINE_VERSION,
+  buildEfficiencyRateTable,
+  buildRegionalConvertedListings,
+  aggregateBuildingMedians,
+  calculateAdjustmentFactors,
+} from "../services/rentalCalculationEngine";
 
 export interface IDatasetRepository {
   createDataset(metadata: DatasetMetadata): Promise<void>;
@@ -192,20 +199,46 @@ export class ValuationRepository implements IValuationRepository {
     });
   }
 
+  /**
+   * 저장된 산정 결과가 옛 엔진 산출이면 다시 계산해 덮어쓴다.
+   *
+   * 산정은 업로드 시점에 한 번 돌고 결과만 저장된다. 그래서 엔진을 고쳐도 이미
+   * 브라우저에 들어와 있는 분기는 옛 숫자를 계속 보여준다 — 2026-09-08 에 실측
+   * 전용률 반영이 기존 데이터셋에 안 먹은 원인이 이것이었다. 판이 다르면 원본
+   * 매물(rawListings)로 업로드 때와 똑같은 순서를 다시 밟는다.
+   *
+   * 원본 매물이 없으면(아주 옛 데이터셋) 다시 계산할 방법이 없으므로 저장된 값을
+   * 그대로 돌려준다. 이때 결과의 calculationVersion 이 현재 판과 다르니, 화면은
+   * 그걸 보고 "옛 엔진 산출"이라고 알릴 수 있다.
+   */
+  private async refreshIfStale(
+    datasetId: string,
+    stored: CalculationResult[]
+  ): Promise<CalculationResult[]> {
+    if (stored.length === 0) return stored;
+    if (stored.every((r) => r.calculationVersion === CALC_ENGINE_VERSION)) return stored;
+
+    const raw = await listingRepository.getRawListings(datasetId);
+    if (raw.length === 0) return stored;
+
+    const effTable = buildEfficiencyRateTable(raw, datasetId);
+    const converted = buildRegionalConvertedListings(raw, effTable);
+    const medians = aggregateBuildingMedians(converted, raw, datasetId);
+    const fresh = calculateAdjustmentFactors(medians, datasetId);
+    if (fresh.length === 0) return stored;
+
+    await this.saveCalculationResults(fresh);
+    return fresh;
+  }
+
   async getCalculationResult(datasetId: string, buildingId: string): Promise<CalculationResult | null> {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORES.CALCULATION_RESULTS, "readonly");
-      const store = tx.objectStore(STORES.CALCULATION_RESULTS);
-      const req = store.get([datasetId, buildingId]);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
+    const all = await this.getCalculationResultsByDataset(datasetId);
+    return all.find((r) => r.buildingId === buildingId) || null;
   }
 
   async getCalculationResultsByDataset(datasetId: string): Promise<CalculationResult[]> {
     const db = await openDatabase();
-    return new Promise((resolve, reject) => {
+    const stored = await new Promise<CalculationResult[]>((resolve, reject) => {
       const tx = db.transaction(STORES.CALCULATION_RESULTS, "readonly");
       const store = tx.objectStore(STORES.CALCULATION_RESULTS);
       const index = store.index("datasetId");
@@ -213,6 +246,7 @@ export class ValuationRepository implements IValuationRepository {
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => reject(req.error);
     });
+    return this.refreshIfStale(datasetId, stored);
   }
 
   async saveConfirmedValuation(result: ConfirmedValuation): Promise<void> {

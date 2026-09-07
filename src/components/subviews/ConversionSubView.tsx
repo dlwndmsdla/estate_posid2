@@ -299,14 +299,34 @@ export function ConversionSubView() {
 
           {/* Efficiency Table Component */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-600" />
-                지역·권역별 전용률 통계표 (알스퀘어 데이터 기반)
-              </h3>
-              <span className="text-xs text-slate-500 font-mono">
-                전체 중앙값: {(efficiencyTable.overallMedian * 100).toFixed(1)}%
-              </span>
+            <div className="p-4 border-b border-slate-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  지역·권역별 전용률 통계표
+                  {efficiencyTable.isInitialDefaultUsed ? (
+                    <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                      저장된 초기 기준값 (이번 분기 계산 아님)
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-bold text-indigo-800 bg-indigo-100 border border-indigo-300 px-2 py-0.5 rounded-full">
+                      이번 분기 알스퀘어 매물로 계산
+                    </span>
+                  )}
+                </h3>
+                <span className="text-xs text-slate-500 font-mono">
+                  전체 중앙값: {(efficiencyTable.overallMedian * 100).toFixed(1)}%
+                </span>
+              </div>
+              {/* 실측 전용률을 매물마다 쓰기 시작하면서(2026-09-08) 이 표의 역할이 바뀌었다.
+                  이제는 "모든 매물에 곱하는 값"이 아니라 "실측이 없을 때 쓰는 대체값"이다. */}
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                이 표는 <span className="font-bold">대체값</span>입니다. 알스퀘어 매물은 그 매물이 가진
+                전용면적÷임대면적을 먼저 쓰고, 임대면적이 없는 매물(네모 전부, 알스퀘어 일부)만 아래
+                권역값 → 지역값 순으로 대신합니다. 실제로 무엇이 적용됐는지는 아래
+                <span className="font-bold"> "2. 전체 지역매물 계약환산"</span> 표의
+                <span className="font-bold"> 10번 열</span>에 매물마다 표시됩니다.
+              </p>
             </div>
 
             <div className="overflow-x-auto">
@@ -381,6 +401,12 @@ export function ConversionSubView() {
                         {row.isFallbackUsed ? (
                           <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-medium text-[11px] inline-block">
                             ⚠️ {row.fallbackReason || "지역값 적용 (폴백)"}
+                          </span>
+                        ) : efficiencyTable.isInitialDefaultUsed ? (
+                          // 표 전체가 저장된 초기 기준값일 때 행마다 "정상 적용"을 띄우면
+                          // 이번 분기 매물로 계산한 것처럼 읽힌다.
+                          <span className="text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 font-medium text-[11px] inline-block">
+                            저장된 기준값
                           </span>
                         ) : (
                           <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-medium text-[11px] inline-block">

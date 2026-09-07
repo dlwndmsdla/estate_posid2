@@ -6,8 +6,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { CleanedListing, BuildingMedian, CalculationResult } from "../types/dataset";
 import { listingRepository, valuationRepository, datasetRepository } from "../db/repository";
-import { activeBuildingsInfo, prdDataset } from "../prdDataset";
+import { activeBuildingsInfo } from "../prdDataset";
+import { HALL_SPECS } from "../services/rentalCalculationEngine";
 import {
+  AlertTriangle,
   BarChart3,
   Building2,
   Filter,
@@ -105,57 +107,45 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
     }
   };
 
-  // Fallback to PRD mock listings if cleanedListings is empty for chosen dataset
+  // 업로드된 매물만 그린다. 예전에는 비어 있으면 지어낸 표본 38건(prdDataset)을
+  // 대신 그렸는데, 아무것도 안 올린 상태에서 실제 시장 데이터처럼 보여 위험했다.
+  // 데이터가 없으면 없다고 말한다 — 다른 화면과 같은 규칙이다.
   const effectiveListings: ListingPlotData[] = useMemo(() => {
-    if (cleanedListings.length > 0) {
-      return cleanedListings
-        .filter((item) => !item.excludeFromCalculation && item.validation.isValid)
-        .map((item) => ({
-          src: item.sourcePlatform || "알스퀘어",
-          area: item.grossAreaSqm || item.leaseArea * 1.6 || 1000,
-          unit: Math.round(item.unitRentPerContractSqmPerMonth),
-          mgmt: item.monthlyManagementFee ? (item.monthlyManagementFee * 10000) / item.leaseArea : undefined,
-          use: item.buildingUse || "기타",
-          region: item.region,
-          zone: item.zone,
-          year: item.builtYear,
-          subway: item.subwayDistanceMeters,
-          name: item.buildingName,
-          isHall: false,
-        }));
-    }
-
-    // Default sample fallback
-    return prdDataset.map((item) => ({
-      src: item.source || "알스퀘어",
-      area: item.grossAreaSqm || 1000,
-      unit: Math.round(item.monthlyRentPerSqm * 3305.8), // 만원/평 -> 원/㎡ 변환
-      mgmt: item.maintenancePerSqm ? item.maintenancePerSqm * 3305.8 : undefined,
-      use: item.useType || "업무시설",
-      region: item.city === "당산" || item.city === "영등포" ? "서울" : item.city,
-      zone: item.tradeArea,
-      year: item.builtYear,
-      subway: item.distanceMeters,
-      name: item.name,
-      isHall: false,
-    }));
+    return cleanedListings
+      .filter((item) => !item.excludeFromCalculation && item.validation.isValid)
+      .map((item) => ({
+        src: item.sourcePlatform || "알스퀘어",
+        area: item.grossAreaSqm || item.leaseArea * 1.6 || 1000,
+        unit: Math.round(item.unitRentPerContractSqmPerMonth),
+        mgmt: item.monthlyManagementFee ? (item.monthlyManagementFee * 10000) / item.leaseArea : undefined,
+        use: item.buildingUse || "기타",
+        region: item.region,
+        zone: item.zone,
+        year: item.builtYear,
+        subway: item.subwayDistanceMeters,
+        name: item.buildingName,
+        isHall: false,
+      }));
   }, [cleanedListings]);
 
-  // Hall benchmark points
+  // 회관 기준점. 산정 결과가 있는 회관만 찍는다.
+  // 예전에는 결과가 없으면 당산 10,672 / 그 외 11,121 원을 넣었는데, 근거 없는
+  // 숫자가 차트에 회관 임대료로 찍히는 것이라 뺐다.
   const hallListings: ListingPlotData[] = useMemo(() => {
-    return activeBuildingsInfo.map((b) => {
+    return activeBuildingsInfo.flatMap((b) => {
       const calc = calcs.find((c) => c.buildingId === b.id);
-      return {
+      if (!calc) return [];
+      return [{
         src: "우체국보험회관",
         area: b.grossAreaSqm,
-        unit: calc ? calc.finalRent : b.id === "dangsan" ? 10672 : 11121,
+        unit: calc.finalRent,
         use: "업무시설",
         region: b.city,
         zone: b.tradeArea,
         year: b.builtYear,
         name: b.name,
         isHall: true,
-      };
+      }];
     });
   }, [calcs]);
 
@@ -281,44 +271,81 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
       });
     }
 
-    // Default benchmarks if low sample
-    const benchmarks: Record<string, { med: number; mean: number; count: number }> = {
-      서울: { med: 0.506, mean: 0.547, count: 150 },
-      부산: { med: 0.635, mean: 0.638, count: 332 },
-      대구: { med: 0.622, mean: 0.645, count: 236 },
-      광주: { med: 0.688, mean: 0.677, count: 190 },
-    };
-
-    return Object.keys(benchmarks).map((reg) => {
-      const arr = map[reg] || [];
-      if (arr.length > 5) {
+    // 표본이 6건 미만인 지역은 뺀다. 예전에는 여기서 6/29 고정값(서울 0.506 등)을
+    // 대신 넣었는데, 어떤 파일을 올려도 같은 숫자가 나와 검증이 불가능했다.
+    return Object.keys(map)
+      .filter((reg) => map[reg].length > 5)
+      .map((reg) => {
+        const arr = map[reg];
         const sorted = [...arr].sort((a, b) => a - b);
         const med = sorted[Math.floor(sorted.length / 2)];
         const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
         return { region: reg, med: Number(med.toFixed(3)), mean: Number(mean.toFixed(3)), count: arr.length };
-      }
-      return { region: reg, ...benchmarks[reg] };
-    });
+      });
   }, [cleanedListings]);
 
-  // Zone Jeonyul Data
+  // 권역별 전용률. 업로드된 매물에서 계산한다.
+  // 예전에는 이 블록 전체가 6/29 수치 11줄을 그대로 박아 둔 상수였고 useMemo 의존성도
+  // 비어 있어서, 어떤 분기를 올리든 같은 표가 나왔다.
   const jeonyulZoneData: JeonyulZoneStats[] = useMemo(() => {
-    return [
-      { region: "광주", zone: "동구_금남로", med: 0.7, mean: 0.692, count: 120, hallName: "" },
-      { region: "광주", zone: "서구_상무", med: 0.651, mean: 0.651, count: 70, hallName: "광주회관" },
-      { region: "대구", zone: "동구_동대구로", med: 0.659, mean: 0.685, count: 52, hallName: "" },
-      { region: "대구", zone: "수성구_동대구", med: 0.622, mean: 0.637, count: 96, hallName: "" },
-      { region: "대구", zone: "중구남구_도심", med: 0.574, mean: 0.616, count: 82, hallName: "대구회관" },
-      { region: "부산", zone: "부산진구_서면", med: 0.658, mean: 0.636, count: 121, hallName: "" },
-      { region: "부산", zone: "연제구_시청", med: 0.642, mean: 0.664, count: 62, hallName: "" },
-      { region: "부산", zone: "동구_부산역", med: 0.635, mean: 0.651, count: 42, hallName: "" },
-      { region: "부산", zone: "중구_남포중앙동", med: 0.598, mean: 0.618, count: 107, hallName: "부산회관" },
-      { region: "서울", zone: "당산_문래", med: 0.55, mean: 0.625, count: 31, hallName: "당산회관" },
-      { region: "서울", zone: "여의도", med: 0.504, mean: 0.523, count: 115, hallName: "" },
-    ];
-  }, []);
+    const map: Record<string, { region: string; zone: string; rates: number[] }> = {};
+    cleanedListings.forEach((c) => {
+      if (!c.region || !c.zone) return;
+      if (!c.exclusiveArea || !c.leaseArea || c.leaseArea <= 0) return;
+      const key = `${c.region}/${c.zone}`;
+      if (!map[key]) map[key] = { region: c.region, zone: c.zone, rates: [] };
+      map[key].rates.push(c.exclusiveArea / c.leaseArea);
+    });
+
+    return Object.values(map)
+      .filter((g) => g.rates.length > 5)
+      .map((g) => {
+        const sorted = [...g.rates].sort((a, b) => a - b);
+        const med = sorted[Math.floor(sorted.length / 2)];
+        const mean = g.rates.reduce((a, b) => a + b, 0) / g.rates.length;
+        const hall = HALL_SPECS.find((h) => h.region === g.region && h.zone === g.zone);
+        return {
+          region: g.region,
+          zone: g.zone,
+          med: Number(med.toFixed(3)),
+          mean: Number(mean.toFixed(3)),
+          count: g.rates.length,
+          hallName: hall ? hall.buildingName : "",
+        };
+      })
+      .sort((a, b) => a.region.localeCompare(b.region) || b.count - a.count);
+  }, [cleanedListings]);
 
   const COLORS = ["#3b6fe0", "#12a150", "#f59e0b", "#a855f7", "#64748b", "#cbd5e1"];
+
+  // 매물이 없으면 빈 차트를 그리지 않고 이유를 말한다.
+  if (!isLoading && cleanedListings.length === 0) {
+    return (
+      <div className="space-y-6 pb-12">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider mb-1">
+            <BarChart3 className="w-4 h-4" />
+            EXPLORATORY DATA ANALYSIS (EDA) & CALIBRATION MATRIX
+          </div>
+          <h2 className="text-lg md:text-xl font-extrabold text-slate-900">
+            분기별 크롤링 매물 EDA 분석 및 보정계수 검토 대시보드
+          </h2>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-sm text-amber-900">
+            <h3 className="font-bold mb-1">이 분기에 반입된 매물이 없습니다</h3>
+            <p className="text-xs leading-relaxed">
+              이 화면은 업로드한 매물만 그립니다. 예전에는 데이터가 없을 때 예시 매물을 대신
+              그렸는데, 실제 시장 데이터로 오해할 수 있어 없앴습니다.{" "}
+              <span className="font-bold">1단계 · 자료 반입</span>에서 분기 엑셀을 올리고
+              <span className="font-bold"> "데이터셋 생성 및 검증 저장"</span>까지 눌러 주세요.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">

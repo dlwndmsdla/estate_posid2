@@ -906,7 +906,7 @@ export function calculateHallComparison(
  */
 
 /** 회관의 물리적 제원. 계산 결과가 아니라 건물 자체의 사실이라 고정값이다. */
-const HALL_SPECS = [
+export const HALL_SPECS = [
   { buildingId: "dangsan", buildingName: "당산회관", region: "서울", zone: "당산_문래", grossArea: 23573.93, builtYear: 2021 },
   { buildingId: "yeongdeungpo", buildingName: "영등포회관", region: "서울", zone: "영등포", grossArea: 14476.76, builtYear: 1988 },
   { buildingId: "busan", buildingName: "부산회관", region: "부산", zone: "중구_남포중앙동", grossArea: 33148.77, builtYear: 1989 },
@@ -956,6 +956,19 @@ function statsOf(group: BuildingMedian[]): GroupStats {
     iqrRatioPercent: median > 0 ? ((q3 - q1) / median) * 100 : Number.POSITIVE_INFINITY,
   };
 }
+
+/**
+ * 산정 엔진 판(版). 저장된 산정 결과에 이 값을 찍어 둔다.
+ *
+ * 왜 필요한가 — 산정 결과는 업로드 시점에 계산해 IndexedDB 에 넣고, 화면은 저장된
+ * 값을 읽기만 한다. 그래서 엔진을 고쳐도 이미 올라간 분기의 숫자는 옛 계산 그대로
+ * 남는다. 2026-09-08 에 실제로 겪은 일이다 — 매물 실측 전용률을 쓰도록 고쳤는데
+ * 브라우저에 남아 있던 데이터셋은 수정 전 값을 계속 보여줬다.
+ *
+ * 이 값을 바꾸면 저장소가 옛 결과를 알아보고 다시 계산한다(db/repository.ts).
+ * 산출 숫자가 달라지는 수정을 하면 반드시 함께 올릴 것.
+ */
+export const CALC_ENGINE_VERSION = "v2.1-실측전용률";
 
 export function calculateAdjustmentFactors(
   buildingMedians: BuildingMedian[],
@@ -1114,7 +1127,7 @@ export function calculateAdjustmentFactors(
       recommendedRent: Math.round(baseRegionalRent * recTotal),
       finalRent: Math.round(baseRegionalRent * recTotal),
       calculatedAt: now,
-      calculationVersion: "v2.0",
+      calculationVersion: CALC_ENGINE_VERSION,
       formulaVersion: "RS-2026Q2",
     };
   });
