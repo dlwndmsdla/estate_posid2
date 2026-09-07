@@ -47,6 +47,26 @@ interface BuildingCalculationViewProps {
   onValuationConfirmed: (datasetId: string) => void;
 }
 
+/**
+ * 슬라이더 폭. 추천값 ±10% 가 기본이지만, 지금 적용된 값이 그 밖이면 거기까지 넓힌다.
+ *
+ * 관측계수를 그대로 적용하면 ±10% 를 넘는 경우가 있다 — 영등포회관 규모 관측계수가
+ * 1.935 인데 추천은 게이트에 걸려 1.000 이다. 폭을 안 넓히면 슬라이더가 손잡이를 끝에
+ * 붙여 놓아, 실제 적용값과 화면이 어긋난다.
+ */
+function factorRange(base: number, applied: number) {
+  const lo = Math.min(base * 0.9, applied);
+  const hi = Math.max(base * 1.1, applied);
+  return { min: Number(lo.toFixed(3)), max: Number(hi.toFixed(3)) };
+}
+
+/** 추천값 대비 몇 %인지. 폭이 넓어졌을 때 눈금이 계속 맞도록 계산해서 적는다. */
+function pctLabel(value: number, base: number): string {
+  if (!base) return "";
+  const pct = (value / base - 1) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`;
+}
+
 export function BuildingCalculationView({
   selectedDatasetId,
   onValuationConfirmed,
@@ -904,19 +924,59 @@ export function BuildingCalculationView({
                   </h3>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setAppliedZoneFactor(calculationResult.recommendedFactors.zone);
-                    setAppliedSizeFactor(calculationResult.recommendedFactors.size);
-                    setAppliedAgeFactor(calculationResult.recommendedFactors.age);
-                    setAppliedMarketFactor(calculationResult.recommendedFactors.marketPolicy ?? 1.000);
-                    setAdjustmentReason("추천 보정계수 원안 수용");
-                  }}
-                  className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg transition cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  추천 보정계수 초기화
-                </button>
+                {/*
+                  세 가지 출발점을 한 번에 고를 수 있게 한다.
+                    관측 — 이번 분기 매물에서 그대로 나온 값. 게이트에 걸려 추천에서
+                           1.000 으로 눌린 계수를 담당자가 되살리고 싶을 때 쓴다.
+                    추천 — 게이트를 통과한 값(기본값).
+                    초기화 — 보정 없음(1.000). 어디까지가 보정 때문인지 볼 때 쓴다.
+                */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      setAppliedZoneFactor(calculationResult.zoneFactorDetail.observedFactor);
+                      setAppliedSizeFactor(calculationResult.sizeFactorDetail.observedFactor);
+                      setAppliedAgeFactor(calculationResult.ageFactorDetail.observedFactor);
+                      setAppliedMarketFactor(1.000);
+                      setAdjustmentReason("EDA 관측 보정계수를 그대로 적용 (게이트 중립화 해제)");
+                    }}
+                    title="매물 EDA 탭 맨 아래 표의 관측계수를 그대로 넣는다"
+                    className="flex items-center gap-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    관측계수 적용
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setAppliedZoneFactor(calculationResult.recommendedFactors.zone);
+                      setAppliedSizeFactor(calculationResult.recommendedFactors.size);
+                      setAppliedAgeFactor(calculationResult.recommendedFactors.age);
+                      setAppliedMarketFactor(calculationResult.recommendedFactors.marketPolicy ?? 1.000);
+                      setAdjustmentReason("추천 보정계수 원안 수용");
+                    }}
+                    title="게이트를 통과한 추천값. 산정 결과의 기본 상태다"
+                    className="flex items-center gap-1 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    추천계수 적용
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setAppliedZoneFactor(1.000);
+                      setAppliedSizeFactor(1.000);
+                      setAppliedAgeFactor(1.000);
+                      setAppliedMarketFactor(1.000);
+                      setAdjustmentReason("");
+                    }}
+                    title="네 계수를 모두 1.000 으로 — 보정 없는 지역 기준단가만 남는다"
+                    className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    초기화
+                  </button>
+                </div>
               </div>
 
               {/* Sliders / Inputs */}
@@ -924,8 +984,7 @@ export function BuildingCalculationView({
                 {/* Zone Slider */}
                 {(() => {
                   const baseZone = calculationResult.recommendedFactors.zone;
-                  const minZone = Number((baseZone * 0.90).toFixed(3));
-                  const maxZone = Number((baseZone * 1.10).toFixed(3));
+                  const { min: minZone, max: maxZone } = factorRange(baseZone, appliedZoneFactor);
                   return (
                     <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
                       <div className="flex justify-between items-center font-bold">
@@ -956,9 +1015,9 @@ export function BuildingCalculationView({
                         className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
                       />
                       <div className="flex justify-between text-[9px] text-slate-400 font-mono">
-                        <span>{minZone} (-10%)</span>
+                        <span>{minZone} ({pctLabel(minZone, baseZone)})</span>
                         <span>{baseZone} (추천)</span>
-                        <span>{maxZone} (+10%)</span>
+                        <span>{maxZone} ({pctLabel(maxZone, baseZone)})</span>
                       </div>
                     </div>
                   );
@@ -967,8 +1026,7 @@ export function BuildingCalculationView({
                 {/* Size Slider */}
                 {(() => {
                   const baseSize = calculationResult.recommendedFactors.size;
-                  const minSize = Number((baseSize * 0.90).toFixed(3));
-                  const maxSize = Number((baseSize * 1.10).toFixed(3));
+                  const { min: minSize, max: maxSize } = factorRange(baseSize, appliedSizeFactor);
                   return (
                     <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
                       <div className="flex justify-between items-center font-bold">
@@ -999,9 +1057,9 @@ export function BuildingCalculationView({
                         className="w-full accent-emerald-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
                       />
                       <div className="flex justify-between text-[9px] text-slate-400 font-mono">
-                        <span>{minSize} (-10%)</span>
+                        <span>{minSize} ({pctLabel(minSize, baseSize)})</span>
                         <span>{baseSize} (추천)</span>
-                        <span>{maxSize} (+10%)</span>
+                        <span>{maxSize} ({pctLabel(maxSize, baseSize)})</span>
                       </div>
                     </div>
                   );
@@ -1010,8 +1068,7 @@ export function BuildingCalculationView({
                 {/* Age Slider */}
                 {(() => {
                   const baseAge = calculationResult.recommendedFactors.age;
-                  const minAge = Number((baseAge * 0.90).toFixed(3));
-                  const maxAge = Number((baseAge * 1.10).toFixed(3));
+                  const { min: minAge, max: maxAge } = factorRange(baseAge, appliedAgeFactor);
                   return (
                     <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
                       <div className="flex justify-between items-center font-bold">
@@ -1042,9 +1099,9 @@ export function BuildingCalculationView({
                         className="w-full accent-amber-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
                       />
                       <div className="flex justify-between text-[9px] text-slate-400 font-mono">
-                        <span>{minAge} (-10%)</span>
+                        <span>{minAge} ({pctLabel(minAge, baseAge)})</span>
                         <span>{baseAge} (추천)</span>
-                        <span>{maxAge} (+10%)</span>
+                        <span>{maxAge} ({pctLabel(maxAge, baseAge)})</span>
                       </div>
                     </div>
                   );
