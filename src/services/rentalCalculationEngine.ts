@@ -1092,6 +1092,37 @@ export function calculateAdjustmentFactors(
 }
 
 /**
+ * 원본 매물 → 산정 결과까지 한 번에.
+ *
+ * 전용률표 → 계약단가 환산 → 건물별 중앙값 → 보정계수. 이 네 걸음이 산정의
+ * 전부이고, 순서를 건너뛰면 안 된다.
+ *
+ * 왜 함수로 묶었나 — 같은 네 걸음이 업로드 화면·검증 화면·산정 화면·저장소에
+ * 각각 따로 적혀 있었는데, 그중 둘은 아예 다른 길로 갔다. 2단계 "산정 실행"과
+ * 3단계의 즉석 계산은 옛 calculationEngine 을 타면서 전용률을 매물·권역별로
+ * 구하지 않고 전국 일괄 62%로 놓고 계산했다(excelEngine 의 effRate = 0.62).
+ * 그래서 1단계 업로드가 만들어 둔 올바른 건물 중앙값을 2단계 버튼 한 번이
+ * 덮어썼다. 서울은 실제 전용률이 0.506 이라 계약단가가 20% 넘게 부풀었다.
+ *
+ * 산정 경로는 이 함수 하나뿐이다 — 다른 곳에서 네 걸음을 다시 적지 말 것.
+ */
+export function runValuationPipeline(
+  rawListings: RawListing[],
+  datasetId: string
+): {
+  efficiencyTable: EfficiencyRateTable;
+  convertedListings: RegionalConvertedListing[];
+  buildingMedians: BuildingMedian[];
+  results: CalculationResult[];
+} {
+  const efficiencyTable = buildEfficiencyRateTable(rawListings, datasetId);
+  const convertedListings = buildRegionalConvertedListings(rawListings, efficiencyTable);
+  const buildingMedians = aggregateBuildingMedians(convertedListings, rawListings, datasetId);
+  const results = calculateAdjustmentFactors(buildingMedians, datasetId);
+  return { efficiencyTable, convertedListings, buildingMedians, results };
+}
+
+/**
  * 10. Excel Export (`exportEfficiencyComparisonWorkbook`)
  * Output filename format: 전용률_계약환산_비교_{연도}Q{분기}_{버전}.xlsx
  */

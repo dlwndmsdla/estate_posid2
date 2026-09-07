@@ -10,7 +10,6 @@ import {
   RawListing,
   CleanedListing,
   ListingValidation,
-  EfficiencyRateApplication,
   ListingEligibility,
 } from "../types/dataset";
 
@@ -753,16 +752,13 @@ export function validateAndCleanListings(
       duplicateRowCount++;
     }
 
-    // Standard Efficiency Rate Application
-    const effRate = 0.62;
-    const sourceType: EfficiencyRateApplication["sourceType"] = "overall";
-    const sourceName = "전국 표준 전용률(62.0%)";
-    efficiencyMissingCount++;
-
-    // Unit prices per Exclusive Area (원/㎡)
+    // 전용면적당 단가(원/㎡). 계약단가로 바꾸는 것은 여기서 하지 않는다 —
+    // 전용률은 매물·권역마다 다르고 데이터셋 전체를 봐야 정해지기 때문이다
+    // (rentalCalculationEngine 의 runValuationPipeline). 예전에는 이 자리에서
+    // 전국 일괄 62%를 곱해 계약단가를 만들어 뒀고, 그 값이 2단계 검증 표와
+    // 옛 산정 경로로 흘러가 정식 산정과 다른 답을 냈다.
     const rentPerExclusiveArea =
       exArea > 0 ? Math.round((mRent * 10000) / exArea) : 0;
-    const rentPerContractArea = Math.round(rentPerExclusiveArea * effRate);
 
     const isValid = errorCodes.length === 0;
 
@@ -795,13 +791,7 @@ export function validateAndCleanListings(
         warningCodes,
       },
       eligibility,
-      efficiencyRate: {
-        appliedRate: effRate,
-        sourceType,
-        sourceName,
-      },
       rentPerExclusiveArea,
-      rentPerContractArea,
       depositPerSqm: exArea > 0 ? Math.round((depositVal * 10000) / exArea) : 0,
       maintenancePerSqm: exArea > 0 ? Math.round((maintVal * 10000) / exArea) : 0,
       isDuplicate: isDupListingId || isDupProperty,

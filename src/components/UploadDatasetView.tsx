@@ -24,12 +24,7 @@ import {
   COLUMN_GROUPS,
   ColumnGroup,
 } from "../services/excelEngine";
-import {
-  buildEfficiencyRateTable,
-  buildRegionalConvertedListings,
-  aggregateBuildingMedians,
-  calculateAdjustmentFactors,
-} from "../services/rentalCalculationEngine";
+import { runValuationPipeline } from "../services/rentalCalculationEngine";
 import {
   datasetRepository,
   listingRepository,
@@ -245,14 +240,11 @@ export function UploadDatasetView({
         validationSummary.cleanedListings
       );
 
-      // Compute Efficiency Rates, Converted Listings, Building Medians & Valuation
-      const effTable = buildEfficiencyRateTable(parsedRaw, datasetId);
-      const converted = buildRegionalConvertedListings(parsedRaw, effTable);
-      const bMedians = aggregateBuildingMedians(converted, parsedRaw, datasetId);
-      const valResults = calculateAdjustmentFactors(bMedians, datasetId);
+      // 전용률표 → 계약단가 환산 → 건물별 중앙값 → 보정계수
+      const { buildingMedians, results } = runValuationPipeline(parsedRaw, datasetId);
 
-      await listingRepository.saveBuildingMedians(datasetId, bMedians);
-      await valuationRepository.saveCalculationResults(valResults);
+      await listingRepository.saveBuildingMedians(datasetId, buildingMedians);
+      await valuationRepository.saveCalculationResults(results);
 
       // Save column mapping rule
       await mappingRepository.saveMappingRule(mapping);

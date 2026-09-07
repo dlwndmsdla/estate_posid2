@@ -84,12 +84,6 @@ export interface ListingValidation {
   warningCodes: string[];
 }
 
-export interface EfficiencyRateApplication {
-  appliedRate: number; // e.g. 0.58 (58%)
-  sourceType: "listing" | "building" | "zone" | "region" | "overall";
-  sourceName: string;
-}
-
 export interface ListingEligibility {
   validForContractConversion: boolean;
   validForRegionalBaseRent: boolean;
@@ -102,9 +96,7 @@ export interface ListingEligibility {
 export interface CleanedListing extends RawListing {
   validation: ListingValidation;
   eligibility: ListingEligibility;
-  efficiencyRate: EfficiencyRateApplication;
   rentPerExclusiveArea: number; // 전용면적당 월임대료 (원/㎡)
-  rentPerContractArea: number;  // 계약면적당 월임대료 (원/㎡)
   depositPerSqm: number;        // 계약면적당 보증금 (원/㎡)
   maintenancePerSqm: number;    // 계약면적당 관리비 (원/㎡)
   isDuplicate: boolean;

@@ -15,11 +15,8 @@ import {
   datasetRepository,
   listingRepository,
 } from "../db/repository";
-import {
-  compareQuarterDatasets,
-  calculateBuildingMedians,
-  calculateDatasetValuations,
-} from "../services/calculationEngine";
+import { compareQuarterDatasets } from "../services/calculationEngine";
+import { runValuationPipeline } from "../services/rentalCalculationEngine";
 import { HALLS } from "../services/halls";
 import {
   getActualContractStore,
@@ -108,11 +105,10 @@ export function BuildingCalculationView({
         // 아직 산정을 실행하지 않은 데이터셋 — 저장된 결과가 없으면 업로드된
         // 매물에서 즉석 계산한다. 기본값을 지어내면 어떤 파일을 올려도 같은
         // 숫자가 나와 검증이 불가능해진다.
-        const listings = await listingRepository.getCleanedListings(selectedDatasetId);
-        if (listings.length > 0) {
-          const medians = calculateBuildingMedians(selectedDatasetId, listings);
+        const raw = await listingRepository.getRawListings(selectedDatasetId);
+        if (raw.length > 0) {
           calc =
-            calculateDatasetValuations(selectedDatasetId, medians).find(
+            runValuationPipeline(raw, selectedDatasetId).results.find(
               (c) => c.buildingId === selectedBuildingId
             ) || null;
         }

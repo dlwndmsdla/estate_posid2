@@ -4,16 +4,13 @@
  */
 
 import { useState, useEffect } from "react";
-import { CleanedListing, DatasetMetadata } from "../types/dataset";
+import { CleanedListing, DatasetMetadata, RegionalConvertedListing } from "../types/dataset";
 import {
   listingRepository,
   datasetRepository,
   valuationRepository,
 } from "../db/repository";
-import {
-  calculateBuildingMedians,
-  calculateDatasetValuations,
-} from "../services/calculationEngine";
+import { runValuationPipeline } from "../services/rentalCalculationEngine";
 import {
   CheckSquare,
   Search,
@@ -39,6 +36,9 @@ export function DataValidationView({
   onCalculationExecuted,
 }: DataValidationViewProps) {
   const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
+  const [convertedById, setConvertedById] = useState<Map<string, RegionalConvertedListing>>(
+    new Map()
+  );
   const [cleanedListings, setCleanedListings] = useState<CleanedListing[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
@@ -67,6 +67,15 @@ export function DataValidationView({
       setDataset(ds);
       const listings = await listingRepository.getCleanedListings(selectedDatasetId);
       setCleanedListings(listings);
+
+      // 전용률·계약단가 열은 산정과 같은 값을 보여줘야 한다. 파서가 매물마다
+      // 넣어 두는 값은 전국 일괄 62%(excelEngine 의 effRate)라, 그대로 쓰면
+      // 이 화면만 산정과 다른 숫자를 보여준다.
+      const raw = await listingRepository.getRawListings(selectedDatasetId);
+      const converted = raw.length > 0
+        ? runValuationPipeline(raw, selectedDatasetId).convertedListings
+        : [];
+      setConvertedById(new Map(converted.map((c) => [c.listingId, c])));
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -79,13 +88,13 @@ export function DataValidationView({
     setIsCalculating(true);
 
     try {
-      // 1. Calculate building medians
-      const medians = calculateBuildingMedians(selectedDatasetId, cleanedListings);
-      await listingRepository.saveBuildingMedians(selectedDatasetId, medians);
-
-      // 2. Calculate valuations & calibration factors
-      const calcs = calculateDatasetValuations(selectedDatasetId, medians);
-      await valuationRepository.saveCalculationResults(calcs);
+      // 업로드 화면과 똑같은 경로로 다시 돌린다. 예전에는 여기서만 옛 엔진을
+      // 타면서 전용률을 전국 일괄 62%로 놓아, 1단계가 만든 올바른 중앙값을
+      // 이 버튼 한 번이 덮어썼다.
+      const raw = await listingRepository.getRawListings(selectedDatasetId);
+      const { buildingMedians, results } = runValuationPipeline(raw, selectedDatasetId);
+      await listingRepository.saveBuildingMedians(selectedDatasetId, buildingMedians);
+      await valuationRepository.saveCalculationResults(results);
 
       // 3. Update status to 'calculated'
       await datasetRepository.updateDatasetStatus(selectedDatasetId, "calculated");
@@ -378,6 +387,10 @@ export function DataValidationView({
                   const contractArea = item.contractAreaSqm ?? item.leaseArea ?? 0;
                   const grossArea = item.grossFloorAreaSqm ?? item.grossArea ?? 0;
                   const isNemo = item.source === "네모";
+                  const applied = convertedById.get(item.listingId);
+                  const appliedRate = applied ? applied.appliedEfficiencyRate : null;
+                  const appliedRateSource = applied ? applied.appliedRateSource : null;
+                  const appliedContractRent = applied ? applied.rentPerContractSqmAppliedWon : null;
 
                   return (
                     <tr
@@ -443,14 +456,10 @@ export function DataValidationView({
                       {/* Efficiency Rate & Source */}
                       <td className="px-3.5 py-3 text-center font-mono">
                         <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
-                          {(item.efficiencyRate.appliedRate * 100).toFixed(1)}%
+                          {appliedRate !== null ? `${(appliedRate * 100).toFixed(1)}%` : "—"}
                         </span>
                         <div className="text-[10px] text-slate-500 mt-1">
-                          {isNemo
-                            ? item.efficiencyRate.sourceName
-                            : item.efficiencyRate.sourceType === "listing"
-                            ? "고유 전용률"
-                            : item.efficiencyRate.sourceName}
+                          {appliedRateSource ?? "산정 전"}
                         </div>
                       </td>
 
@@ -459,7 +468,9 @@ export function DataValidationView({
                       </td>
 
                       <td className="px-3.5 py-3 text-right font-mono font-extrabold text-indigo-900 bg-indigo-50/20">
-                        {item.rentPerContractArea.toLocaleString()} 원/㎡
+                        {appliedContractRent !== null
+                          ? `${appliedContractRent.toLocaleString()} 원/㎡`
+                          : "—"}
                       </td>
 
                       {/* Step-by-Step Eligibility Badges */}

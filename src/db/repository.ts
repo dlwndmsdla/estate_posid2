@@ -16,10 +16,7 @@ import {
 import { openDatabase, STORES } from "./idb";
 import {
   CALC_ENGINE_VERSION,
-  buildEfficiencyRateTable,
-  buildRegionalConvertedListings,
-  aggregateBuildingMedians,
-  calculateAdjustmentFactors,
+  runValuationPipeline,
 } from "../services/rentalCalculationEngine";
 
 export interface IDatasetRepository {
@@ -221,10 +218,7 @@ export class ValuationRepository implements IValuationRepository {
     const raw = await listingRepository.getRawListings(datasetId);
     if (raw.length === 0) return stored;
 
-    const effTable = buildEfficiencyRateTable(raw, datasetId);
-    const converted = buildRegionalConvertedListings(raw, effTable);
-    const medians = aggregateBuildingMedians(converted, raw, datasetId);
-    const fresh = calculateAdjustmentFactors(medians, datasetId);
+    const { results: fresh } = runValuationPipeline(raw, datasetId);
     if (fresh.length === 0) return stored;
 
     await this.saveCalculationResults(fresh);
