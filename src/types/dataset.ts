@@ -253,6 +253,11 @@ export interface RegionalConvertedListing {
   rentPerContractSqmByRegionWon: number;
   rentPerContractSqmByZoneWon: number;
 
+  /** 실제로 산정에 쓰인 전용률과 그 출처. 매물이 계약·전용면적을 모두 갖고 있으면 그 실측값이 최우선이다. */
+  appliedEfficiencyRate: number;
+  appliedRateSource: "매물실측" | "권역중앙값" | "지역중앙값";
+  rentPerContractSqmAppliedWon: number;
+
   zoneRateFallbackUsed: boolean;
   zoneRateFallbackReason?: string;
 }

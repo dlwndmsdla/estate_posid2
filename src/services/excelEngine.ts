@@ -231,6 +231,22 @@ export const HEADER_ALIASES: Record<string, string[]> = {
   monthlyRentTenThousandWon: ["월세(만원)", "월세만원", "월세"],
   maintenanceFeeTenThousandWon: ["관리비(만원)", "관리비만원", "관리비"],
   exclusiveAreaSqm: ["전용면적(m2)", "전용면적(m²)", "전용면적㎡", "전용면적"],
+  // 임대면적 — 임대료가 부과되는 면적(전용 + 임차인 공용 지분)이며, 매물별 실측 전용률
+  // (전용 ÷ 임대)의 분모다. 알스퀘어 원본 시트의 "임대공급면적(m2)"이 이 값이다.
+  //
+  // 용어 주의: 아파트 분양 용어의 '공급면적'(전용+주거공용)과 '계약면적'(공급+기타공용)은
+  // 서로 다른 개념이지만, 오피스 임대 실무의 '임대면적'은 그 중간이 아니라 별개 관행이고
+  // 이 프로젝트는 이를 '계약(임대)면적'이라 부른다(전용률 = 전용 ÷ 계약(임대)면적).
+  // 실측으로도 이 해석이 맞다 — 알스퀘어 911건의 전용÷임대공급 중앙값이 서울 0.506으로
+  // 오피스 임대면적 기준 전용률 통상치(45~55%)와 맞는다. 좁은 의미의 공급면적이었다면
+  // 70~80%가 나와야 한다. 비교 대상인 R-ONE 앵커도 임대면적 기준이라 분모가 일치한다.
+  // 필드명 contractAreaSqm은 기존 이름을 그대로 둔 것이다.
+  //
+  // 네모에는 이 값이 없다(크롤러가 provisionSize를 받지만 오피스 매물은 전부 비어 오고,
+  // 통합 단계도 전용면적만 싣는다). 그래서 네모 행은 지역·권역 중앙값 전용률로 간다 —
+  // 이 폴백은 옳고, 유지한다. 2026-09 현재 통합데이터 시트에는 알스퀘어 값도 실려 오지
+  // 않는데, 파이프라인 통합 단계에서 이 열을 실어 주면 그때부터 실측 전용률이 적용된다.
+  contractAreaSqm: ["임대공급면적(m2)", "임대공급면적(m²)", "임대공급면적", "계약면적(m2)", "계약면적"],
   listingFloor: ["매물층"],
   buildingName: ["빌딩명", "건물명"],
   roadAddress: ["도로명주소", "주소"],
@@ -504,6 +520,7 @@ export async function parseExcelFile(
     const monthlyRentTenThousandWon = parseNumber(parseVal("monthlyRentTenThousandWon"));
     const maintenanceFeeTenThousandWon = parseNumber(parseVal("maintenanceFeeTenThousandWon"));
     const exclusiveAreaSqm = parseNumber(parseVal("exclusiveAreaSqm"));
+    const contractAreaSqm = parseNumber(parseVal("contractAreaSqm"));
 
     const grossFloorAreaSqm = parseNumber(parseVal("grossFloorAreaSqm"));
     const builtYearRaw = parseNumber(parseVal("builtYear"));
@@ -590,6 +607,8 @@ export async function parseExcelFile(
       leaseArea: exclusiveAreaSqm ?? 0,
       exclusiveArea: exclusiveAreaSqm ?? 0,
       exclusiveAreaSqm: exclusiveAreaSqm ?? 0,
+      // 없으면 넣지 않는다. 0을 넣으면 전용률 계산이 0으로 나눈다.
+      ...(contractAreaSqm && contractAreaSqm > 0 ? { contractAreaSqm } : {}),
       deposit: depositTenThousandWon ?? 0,
       depositTenThousandWon: depositTenThousandWon ?? 0,
       monthlyRent: monthlyRentTenThousandWon ?? 0,

@@ -645,7 +645,24 @@ export function buildRegionalConvertedListings(
     const rentContractByRegion = Math.round(rentExcl * regRate);
     const rentContractByZone = Math.round(rentExcl * zoneRate);
 
+    // 실제로 쓸 전용률: 이 매물의 계약·전용면적이 둘 다 있으면 그 매물의 실측값이 최우선이다.
+    // (전용률 기준 관리 화면이 안내하는 우선순위 1순위 — 2026-09-07 이전에는 안내와 달리
+    //  권역 중앙값만 곱하고 있었다. 이 표본에서 실측값 보유 매물이 765/1,117건이고 실측값과
+    //  권역 중앙값의 차이가 중앙 11%·4건 중 1건은 20%를 넘어, 상수로 바꿔치기하면 결과가
+    //  회관 단위로 최대 10%까지 밀렸다. 전용률과 전용단가의 상관이 -0.32라 오차가 중앙값에서
+    //  상쇄되지도 않는다 — 전용률이 낮은 건물일수록 전용면적당 호가를 높게 부르기 때문이다.)
+    const ownRate = calculateEfficiencyRate(l);
+    const appliedRate = ownRate ?? zoneRate;
+    const appliedRateSource: RegionalConvertedListing["appliedRateSource"] = ownRate
+      ? "매물실측"
+      : fallbackUsed
+        ? "지역중앙값"
+        : "권역중앙값";
+
     return {
+      appliedEfficiencyRate: appliedRate,
+      appliedRateSource,
+      rentPerContractSqmAppliedWon: Math.round(rentExcl * appliedRate),
       source: l.source,
       listingId: l.listingId,
       region: l.region,
@@ -686,12 +703,15 @@ export function aggregateBuildingMedians(
       grossArea: number;
       regionRents: number[];
       zoneRents: number[];
+      appliedRents: number[];
       rawItems: RawListing[];
     }
   >();
 
   convertedListings.forEach((cl) => {
-    const raw = rawListings.find((r) => r.listingId === cl.listingId) || rawListings[0];
+    // 못 찾으면 undefined로 둔다. 예전에는 rawListings[0]을 갖다 썼는데, 그러면 전혀 다른
+    // 건물의 PNU·연면적·준공연도가 이 매물에 붙어 조용히 잘못된 건물로 묶인다.
+    const raw = rawListings.find((r) => r.listingId === cl.listingId);
     
     // Key priority: 1) PNU, 2) RoadAddress + BuildingName, 3) BuildingName
     let bKey = "";
@@ -711,10 +731,20 @@ export function aggregateBuildingMedians(
         region: cl.region,
         zone: cl.zone,
         primaryUse: cl.primaryUse || raw?.primaryUse || "업무시설",
-        completionYear: raw?.builtYear || 2005,
+        // 준공연도가 없으면 0으로 둔다(연식군 필터가 0을 제외한다). 기본값 2005는 없는 값을
+        // 지어내는 것이고, 2000~2010년 준공 회관(대구 2003·광주 2008)의 연식 비교군에
+        // 결측 건물을 통째로 섞어 넣는다.
+        // ⚠ 다만 지금은 방어선일 뿐 실효가 없다 — 파서(excelEngine.ts)와
+        //   parseListingsFromWorkbook이 이미 결측 준공연도를 2005로 채워서 넘기기 때문이다.
+        //   원점을 고치려면 그 두 곳도 함께 손봐야 하고, 준공연도를 그대로 표시하는 화면
+        //   (RawDataViewer·MapContainer)에 0 처리를 넣어야 한다. 현재 분기 데이터는
+        //   준공연도 결측이 0건이라 실제 왜곡은 발생하지 않는다.
+        completionYear:
+          Number.isFinite(raw?.builtYear) && (raw?.builtYear ?? 0) > 0 ? (raw!.builtYear as number) : 0,
         grossArea: raw?.grossFloorAreaSqm || 0,
         regionRents: [],
         zoneRents: [],
+        appliedRents: [],
         rawItems: [],
       });
     }
@@ -723,6 +753,7 @@ export function aggregateBuildingMedians(
     bObj.listingIds.push(cl.listingId);
     bObj.regionRents.push(cl.rentPerContractSqmByRegionWon);
     bObj.zoneRents.push(cl.rentPerContractSqmByZoneWon);
+    bObj.appliedRents.push(cl.rentPerContractSqmAppliedWon);
     if (raw) bObj.rawItems.push(raw);
   });
 
@@ -732,6 +763,8 @@ export function aggregateBuildingMedians(
   buildingMap.forEach((val, bKey) => {
     const medRegionRent = Math.round(calculateMedian(val.regionRents));
     const medZoneRent = Math.round(calculateMedian(val.zoneRents));
+    // 산정에 쓰는 값은 매물 실측 전용률을 우선 적용한 단가다(위 두 개는 화면 비교용).
+    const medAppliedRent = Math.round(calculateMedian(val.appliedRents));
 
     // Calculate median deposit/maintenance from raw items
     const deposits = val.rawItems.map((r) => r.depositTenThousandWon * 10000);
@@ -749,7 +782,7 @@ export function aggregateBuildingMedians(
       grossArea: val.grossArea,
       subwayDistance: val.rawItems[0]?.distanceToHallMeters || 500,
       validListingCount: val.listingIds.length,
-      buildingMedianRent: medZoneRent,
+      buildingMedianRent: medAppliedRent,
       buildingMedianDeposit: Math.round(calculateMedian(deposits)),
       buildingMedianMaintenance: Math.round(calculateMedian(maints)),
     });

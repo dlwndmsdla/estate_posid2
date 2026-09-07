@@ -588,15 +588,16 @@ export function ConversionSubView() {
                     <th className="p-3 text-right">6. 지역별전용률</th>
                     <th className="p-3 text-right">7. 권역별전용률</th>
                     <th className="p-3 text-right">8. 지역전용률 곱한 값(계약 원/㎡)</th>
+                    <th className="p-3 text-right">9. 권역전용률 곱한 값(계약 원/㎡)</th>
                     <th className="p-3 text-right bg-indigo-100/70 text-indigo-900 font-extrabold">
-                      9. 권역전용률 곱한 값(계약 원/㎡)
+                      10. 실제 적용값(계약 원/㎡)
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-mono">
                   {filteredConvertedListings.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-slate-400 font-sans">
+                      <td colSpan={11} className="p-8 text-center text-slate-400 font-sans">
                         검색 조건에 해당되는 환산 매물 데이터가 존재하지 않습니다.
                       </td>
                     </tr>
@@ -640,8 +641,17 @@ export function ConversionSubView() {
                         <td className="p-3 text-right text-slate-700 font-medium">
                           {c.rentPerContractSqmByRegionWon.toLocaleString()} 원
                         </td>
-                        <td className="p-3 text-right font-extrabold text-indigo-700 bg-indigo-50/40 text-sm">
+                        <td className="p-3 text-right text-slate-700 font-medium">
                           {c.rentPerContractSqmByZoneWon.toLocaleString()} 원
+                        </td>
+                        <td className="p-3 text-right font-extrabold text-indigo-700 bg-indigo-50/40 text-sm">
+                          {c.rentPerContractSqmAppliedWon.toLocaleString()} 원
+                          <span
+                            className="block text-[10px] font-sans font-medium text-slate-500"
+                            title={`적용 전용률 ${(c.appliedEfficiencyRate * 100).toFixed(1)}%`}
+                          >
+                            {c.appliedRateSource} {(c.appliedEfficiencyRate * 100).toFixed(1)}%
+                          </span>
                         </td>
                       </tr>
                     ))

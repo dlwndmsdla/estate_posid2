@@ -33,6 +33,9 @@ function listing(
     zoneEfficiencyRate: 0.5,
     rentPerContractSqmByRegionWon: Math.round(exclusiveRent * 0.5),
     rentPerContractSqmByZoneWon: Math.round(exclusiveRent * 0.5),
+    appliedEfficiencyRate: 0.5,
+    appliedRateSource: "권역중앙값",
+    rentPerContractSqmAppliedWon: Math.round(exclusiveRent * 0.5),
     zoneRateFallbackUsed: false,
   };
 }
