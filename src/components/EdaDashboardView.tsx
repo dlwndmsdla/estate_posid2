@@ -718,6 +718,15 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
           {/* Zone Horizontal Bar List */}
           <div className="space-y-2">
             <h4 className="text-xs font-bold text-slate-700">주요 권역별 전용률 매트릭스</h4>
+            {jeonyulZoneData.length === 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900 leading-relaxed">
+                <span className="font-bold">이 분기 파일로는 전용률을 계산할 수 없습니다. </span>
+                전용률 = 전용면적 ÷ 임대(계약)면적인데, 업로드된 매물에 임대면적이 없습니다.
+                네모는 임대면적을 주지 않고, 알스퀘어는 통합데이터에 임대(계약)면적 열이
+                실려 있어야 계산됩니다. 그 열이 없는 분기에는 전용률·계약환산에 저장된
+                기준 전용률표가 대신 쓰입니다.
+              </div>
+            )}
             <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 text-xs font-mono">
               {jeonyulZoneData.map((z) => (
                 <div
@@ -764,7 +773,9 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
                 EDA 분석 기반 AI 추천 보정계수 검토 및 최종 설정
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                분기 크롤링 데이터의 95% 신뢰구간(Bootstrap 1,000회) 통계 검정을 거친 AI 추천값
+                이번 분기 매물로 산정한 회관별 관측·추천 보정계수입니다. 관측값이 그대로
+                추천되지 않은 줄은 게이트(비교 건물 5곳 미만 또는 IQR이 중앙값의 15% 초과)에
+                걸려 중립값 1.000이 적용된 것입니다.
               </p>
             </div>
           </div>
@@ -778,37 +789,60 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 space-y-2">
-            <div className="flex justify-between items-center text-slate-300 font-bold">
-              <span>권역 보정계수 ($K_{`권역`}$)</span>
-              <span className="text-indigo-400 font-mono text-sm">관측 1.085</span>
-            </div>
-            <p className="text-slate-400 text-[11px] leading-relaxed">
-              당산·영등포 권역 오피스 중앙값이 기준군 대비 +8.5% 우세. Bootstrap 95% CI (1.021 ~ 1.142)로 1.0 미포함되어 AI 1.085 추천.
-            </p>
+        {/* 예전에는 이 자리에 "관측 1.085 / Bootstrap 95% CI (1.021~1.142)" 같은 문구가
+            고정 텍스트로 박혀 있었다. 어떤 분기를 올려도 같은 숫자가 떠서, 이번 분기
+            계산으로 오해할 수 있었다. 이제 산정 결과에서 그대로 읽어 온다. */}
+        {calcs.length === 0 ? (
+          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 text-[11px] text-slate-400">
+            이 분기의 산정 결과가 아직 없습니다. 1단계 · 자료 반입에서 엑셀을 올리고
+            저장하면 회관별 보정계수가 여기에 표시됩니다.
           </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 space-y-2">
-            <div className="flex justify-between items-center text-slate-300 font-bold">
-              <span>규모 보정계수 ($K_{`규모`}$)</span>
-              <span className="text-emerald-400 font-mono text-sm">추천 1.000</span>
-            </div>
-            <p className="text-slate-400 text-[11px] leading-relaxed">
-              비교 건물군 간 연면적 차이가 크지 않거나 95% 신뢰구간에 1.000이 포함되어 통계적 차이 미달로 1.000 추천.
-            </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px] text-left">
+              <thead className="text-slate-400 font-bold border-b border-slate-700">
+                <tr>
+                  <th className="py-2 pr-3">회관</th>
+                  <th className="py-2 pr-3">권역 K (관측 → 추천)</th>
+                  <th className="py-2 pr-3">규모 K (관측 → 추천)</th>
+                  <th className="py-2 pr-3">연식 K (관측 → 추천)</th>
+                  <th className="py-2">총 추천계수</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-300 font-mono">
+                {calcs.map((c) => {
+                  const cell = (d: typeof c.zoneFactorDetail) => (
+                    <td className="py-2 pr-3">
+                      {d.observedFactor.toFixed(3)}
+                      <span className="text-slate-500"> → </span>
+                      <span
+                        className={
+                          d.recommendedFactor === 1 && d.observedFactor !== 1
+                            ? "text-amber-400"
+                            : "text-emerald-400"
+                        }
+                      >
+                        {d.recommendedFactor.toFixed(3)}
+                      </span>
+                      <span className="text-slate-500"> ({d.sampleCount}곳)</span>
+                    </td>
+                  );
+                  return (
+                    <tr key={c.buildingId} className="border-b border-slate-800">
+                      <td className="py-2 pr-3 font-sans font-bold text-white">{c.buildingName}</td>
+                      {cell(c.zoneFactorDetail)}
+                      {cell(c.sizeFactorDetail)}
+                      {cell(c.ageFactorDetail)}
+                      <td className="py-2 text-indigo-300 font-bold">
+                        {c.recommendedFactors.total.toFixed(3)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 space-y-2">
-            <div className="flex justify-between items-center text-slate-300 font-bold">
-              <span>연식 보정계수 ($K_{`연식`}$)</span>
-              <span className="text-amber-400 font-mono text-sm">추천 1.000</span>
-            </div>
-            <p className="text-slate-400 text-[11px] leading-relaxed">
-              준공 20년 이상 노후 건물군의 유의미한 단가 하락폭이 경미하여 AI 보수적 1.000 부여.
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
