@@ -4,10 +4,20 @@
  */
 
 import React, { useState, useEffect, useMemo } from "react";
-import { CleanedListing, BuildingMedian, CalculationResult, RawListing } from "../types/dataset";
+import {
+  CleanedListing,
+  BuildingMedian,
+  CalculationResult,
+  RawListing,
+  RegionalConvertedListing,
+} from "../types/dataset";
 import { listingRepository, valuationRepository, datasetRepository } from "../db/repository";
 import { HALLS } from "../services/halls";
-import { HALL_SPECS, calculateEfficiencyRate } from "../services/rentalCalculationEngine";
+import {
+  HALL_SPECS,
+  calculateEfficiencyRate,
+  runValuationPipeline,
+} from "../services/rentalCalculationEngine";
 import {
   AlertTriangle,
   BarChart3,
@@ -81,6 +91,7 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
   const [buildingMedians, setBuildingMedians] = useState<BuildingMedian[]>([]);
   const [calcs, setCalcs] = useState<CalculationResult[]>([]);
   const [rawListings, setRawListings] = useState<RawListing[]>([]);
+  const [converted, setConverted] = useState<RegionalConvertedListing[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Filters
@@ -105,6 +116,11 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
       setBuildingMedians(medians);
       setCalcs(calcResults);
       setRawListings(raws);
+      // 계약면적당 단가는 데이터셋 전체를 봐야 나온다(전용률표 → 환산).
+      // 산정과 같은 함수를 쓴다 — 차트가 산정과 다른 숫자를 보이면 안 된다.
+      setConverted(
+        raws.length > 0 ? runValuationPipeline(raws, selectedDatasetId).convertedListings : []
+      );
     } catch (err) {
       console.error("EDA Data load error:", err);
     } finally {
@@ -116,22 +132,40 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
   // 대신 그렸는데, 아무것도 안 올린 상태에서 실제 시장 데이터처럼 보여 위험했다.
   // 데이터가 없으면 없다고 말한다 — 다른 화면과 같은 규칙이다.
   const effectiveListings: ListingPlotData[] = useMemo(() => {
-    return cleanedListings
-      .filter((item) => !item.excludeFromCalculation && item.validation.isValid)
-      .map((item) => ({
-        src: item.sourcePlatform || "알스퀘어",
-        area: item.grossAreaSqm || item.leaseArea * 1.6 || 1000,
-        unit: Math.round(item.unitRentPerContractSqmPerMonth),
-        mgmt: item.monthlyManagementFee ? (item.monthlyManagementFee * 10000) / item.leaseArea : undefined,
-        use: item.buildingUse || "기타",
-        region: item.region,
-        zone: item.zone,
-        year: item.builtYear,
-        subway: item.subwayDistanceMeters,
-        name: item.buildingName,
+    // 검증에서 걸러진 매물은 뺀다. 정제 결과가 아직 없으면 전부 그린다.
+    const dropped = new Set(
+      cleanedListings
+        .filter((l) => l.excludeFromCalculation || !l.validation.isValid)
+        .map((l) => l.listingId)
+    );
+    const rawById = new Map(rawListings.map((r) => [r.listingId, r]));
+
+    return converted.flatMap((c) => {
+      if (dropped.has(c.listingId)) return [];
+      const r = rawById.get(c.listingId);
+      if (!r) return [];
+
+      const unit = c.rentPerContractSqmAppliedWon;
+      if (!Number.isFinite(unit) || unit <= 0) return [];
+
+      return [{
+        src: r.source || "알스퀘어",
+        // 연면적은 건축물대장에서 온다. 네모 매물은 대장 보강이 없어 비어 있는데,
+        // 예전에는 그 자리에 전용면적 × 1.6 이나 1,000㎡ 를 넣었다. 지어낸 값이라
+        // 0 으로 두고, 가로축이 연면적인 차트에서는 그 점을 빼기로 한다.
+        area: r.grossFloorAreaSqm || r.grossArea || 0,
+        unit: Math.round(unit),
+        mgmt: r.maintenancePerExclusiveSqmWon,
+        use: r.primaryUse || "기타",
+        region: r.region,
+        zone: r.zone,
+        year: r.builtYear || r.completionYear || undefined,
+        subway: r.subwayDistance || undefined,
+        name: r.buildingName,
         isHall: false,
-      }));
-  }, [cleanedListings]);
+      }];
+    });
+  }, [converted, rawListings, cleanedListings]);
 
   // 회관 기준점. 산정 결과가 있는 회관만 찍는다.
   // 예전에는 결과가 없으면 당산 10,672 / 그 외 11,121 원을 넣었는데, 근거 없는
@@ -195,8 +229,8 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
         })
         .map((b) => ({
           src: "건물중앙값",
-          area: b.grossAreaSqm,
-          unit: Math.round(b.medianRentPerContractSqm),
+          area: b.grossArea,
+          unit: Math.round(b.buildingMedianRent),
           use: b.primaryUse || "업무시설",
           region: b.region,
           zone: b.zone,
@@ -239,7 +273,12 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
     const sortedUnits = [...filteredListings.map((x) => x.unit)].sort((a, b) => a - b);
     const medianUnit = sortedUnits.length > 0 ? sortedUnits[Math.floor(sortedUnits.length / 2)] : 0;
 
-    const sortedAreas = [...filteredListings.map((x) => x.area)].sort((a, b) => a - b);
+    // 연면적이 없는 매물(네모 대부분)은 중앙값에서 뺀다. 0 을 넣고 세면
+    // 중앙값이 실제보다 훨씬 작게 나온다.
+    const sortedAreas = filteredListings
+      .map((x) => x.area)
+      .filter((a) => a > 0)
+      .sort((a, b) => a - b);
     const medianArea = sortedAreas.length > 0 ? sortedAreas[Math.floor(sortedAreas.length / 2)] : 0;
 
     return { listCount, bldgCount, medianUnit, medianArea };
@@ -520,13 +559,13 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
                 />
                 <Scatter
                   name="알스퀘어"
-                  data={filteredListings.filter((x) => x.src === "알스퀘어")}
+                  data={filteredListings.filter((x) => x.src === "알스퀘어" && x.area > 0)}
                   fill="#3b6fe0"
                   opacity={0.6}
                 />
                 <Scatter
                   name="네모"
-                  data={filteredListings.filter((x) => x.src === "네모")}
+                  data={filteredListings.filter((x) => x.src === "네모" && x.area > 0)}
                   fill="#f59e0b"
                   opacity={0.6}
                 />
@@ -580,7 +619,12 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
                   ]}
                   contentStyle={{ fontSize: "11px", borderRadius: "12px", border: "1px solid #e2e8f0" }}
                 />
-                <Scatter name="빌딩 중앙값" data={filteredBuildingMedians} fill="#10b981" opacity={0.7} />
+                <Scatter
+                  name="빌딩 중앙값"
+                  data={filteredBuildingMedians.filter((b) => b.area > 0 && b.unit > 0)}
+                  fill="#10b981"
+                  opacity={0.7}
+                />
                 <Scatter name="우체국보험회관" data={filteredHalls} fill="#e5484d" shape="star" />
               </ScatterChart>
             </ResponsiveContainer>
