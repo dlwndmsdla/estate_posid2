@@ -3,45 +3,76 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
-import { History, UserCheck, Edit3, ShieldCheck } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { History, UserCheck, Edit3, ShieldCheck, AlertTriangle } from "lucide-react";
+import { ConfirmedValuation, DatasetMetadata } from "../../types/dataset";
+import { datasetRepository, valuationRepository } from "../../db/repository";
+import { HALL_SPECS } from "../../services/rentalCalculationEngine";
 
+/**
+ * 확정 이력.
+ *
+ * 예전에는 이 화면이 "김자산 (자산운영지원팀 / 과장)", "박팀장 (팀장)" 이라는
+ * 있지도 않은 결재자와 시각·전후값을 지어내 보여줬다. 감사 로그가 허위면
+ * 화면 중에서 가장 위험하다 — 실제 결재가 있었던 것처럼 읽히기 때문이다.
+ *
+ * 지금은 담당자가 4단계에서 실제로 누른 확정 기록(ConfirmedValuation)만 읽는다.
+ * 기록이 없으면 없다고 적는다.
+ */
 export function AuditLogSubView() {
-  const auditLogs = [
-    {
-      id: "log-101",
-      timestamp: "2026-07-25 14:20:11",
-      target: "2026년 2분기 V1 • 서울 당산회관",
-      item: "권역 담당자 적용계수",
-      beforeVal: "1.000",
-      afterVal: "1.085",
-      reason: "당산·영등포 권역 최근 거래호가 중앙값 프리미엄 반영 (AI 추천값 동일 수용)",
-      author: "김자산 (자산운영지원팀 / 과장)",
-      version: "V1.1",
-    },
-    {
-      id: "log-102",
-      timestamp: "2026-07-25 10:15:40",
-      target: "2026년 2분기 V1 • 부산회관",
-      item: "최종 산정 임대가격 확정",
-      beforeVal: "미확정 (6,600 원/㎡)",
-      afterVal: "확정 (6,850 원/㎡)",
-      reason: "부산 서면·중구 권역 오피스 시장 호가 인상분 반영 최종 승인",
-      author: "박팀장 (자산운영지원팀 / 팀장)",
-      version: "V1.0",
-    },
-    {
-      id: "log-103",
-      timestamp: "2026-04-12 16:05:22",
-      target: "2026년 1분기 V2 • 대구회관",
-      item: "규모 담당자 적용계수",
-      beforeVal: "1.050",
-      afterVal: "1.000",
-      reason: "대구 도심권역 대형빌딩 표본 부족에 따른 AI 추천 표준계수(1.000) 원복",
-      author: "이심사 (자산운영지원팀 / 대리)",
-      version: "V2.0",
-    },
-  ];
+  const [logs, setLogs] = useState<Array<ConfirmedValuation & { quarterLabel: string }>>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const datasets: DatasetMetadata[] = await datasetRepository.listDatasets();
+        const all: Array<ConfirmedValuation & { quarterLabel: string }> = [];
+        for (const ds of datasets) {
+          const confirmed = await valuationRepository.listConfirmedValuationsByDataset(ds.datasetId);
+          confirmed.forEach((c) =>
+            all.push({
+              ...c,
+              quarterLabel: `${ds.referenceYear}년 ${ds.referenceQuarter}분기 · ${ds.datasetId}`,
+            })
+          );
+        }
+        all.sort((a, b) => (a.confirmedAt < b.confirmedAt ? 1 : -1));
+        if (!cancelled) setLogs(all);
+      } catch (err) {
+        console.error("확정 이력 로드 실패:", err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const hallName = (buildingId: string) =>
+    HALL_SPECS.find((h) => h.buildingId === buildingId)?.buildingName || buildingId;
+
+  const won = (n: number) => `${Math.round(n).toLocaleString()} 원/㎡`;
+
+  const auditLogs = logs.map((c) => {
+    const changed =
+      c.appliedTotalFactor !== c.recommendedTotalFactor
+        ? "담당자가 추천 보정계수를 조정함"
+        : "추천 보정계수 원안 수용";
+    return {
+      id: `${c.datasetId}-${c.buildingId}`,
+      timestamp: c.confirmedAt ? c.confirmedAt.replace("T", " ").slice(0, 19) : "—",
+      target: `${c.quarterLabel} • ${hallName(c.buildingId)}`,
+      item: changed,
+      beforeVal: `추천 ${c.recommendedTotalFactor.toFixed(3)} (${won(c.recommendedRent)})`,
+      afterVal: `적용 ${c.appliedTotalFactor.toFixed(3)} (${won(c.finalRent)})`,
+      reason: c.adjustmentReason || "(사유 미기재)",
+      author: c.confirmedBy || "(작성자 미기재)",
+      version: c.datasetId,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -63,8 +94,24 @@ export function AuditLogSubView() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <span className="text-xs font-bold text-slate-700">담당자 확정 및 수치 수정 감사 로그</span>
-          <span className="text-[11px] text-slate-500 font-mono">총 3건 등록됨</span>
+          <span className="text-[11px] text-slate-500 font-mono">
+            {isLoading ? "불러오는 중…" : `총 ${auditLogs.length}건 등록됨`}
+          </span>
         </div>
+
+        {!isLoading && auditLogs.length === 0 && (
+          <div className="p-6 flex items-start gap-3 text-sm text-amber-900 bg-amber-50">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="font-bold mb-1">확정된 이력이 없습니다</h3>
+              <p className="text-xs leading-relaxed">
+                이 화면은 담당자가 <span className="font-bold">3단계 · 회관별 임대가격 산정</span>에서
+                실제로 확정한 기록만 보여줍니다. 예전에는 예시 결재 이력 3건을 실제처럼 보여줬는데,
+                있지도 않은 승인자와 시각이 적혀 있어 없앴습니다.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="divide-y divide-slate-100">
           {auditLogs.map((log) => (

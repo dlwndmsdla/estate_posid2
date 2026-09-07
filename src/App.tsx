@@ -272,7 +272,7 @@ export default function App() {
           {activeSubMenu === "quarterly-history" && <QuarterlyHistoryView />}
 
           {activeSubMenu === "alerts" && (
-            <AlertsSubView onNavigate={(m, s) => handleNavigate(m, s)} />
+            <AlertsSubView onNavigate={(m, s) => handleNavigate(m, s)} selectedDatasetId={selectedDatasetId} />
           )}
 
           {activeSubMenu === "change-history" && <AuditLogSubView />}

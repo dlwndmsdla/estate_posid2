@@ -3,56 +3,122 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { AlertTriangle, Info, ArrowRight, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { CalculationResult, ConfirmedValuation, FactorDetail } from "../../types/dataset";
+import { valuationRepository } from "../../db/repository";
 
 interface AlertsSubViewProps {
   onNavigate: (main: string, sub: string) => void;
+  selectedDatasetId: string;
 }
 
-export function AlertsSubView({ onNavigate }: AlertsSubViewProps) {
-  const alertsList = [
-    {
-      id: "alt-1",
-      level: "warning",
-      title: "대구회관 연식 비교군 표본 수 소수 (2건)",
-      category: "표본 부족",
-      description: "대구 권역 준공 25년 이상 대형 오피스 크롤링 매물이 2건으로 적어 Bootstrap 95% 신뢰구간폭이 다소 넓게 형성되었습니다.",
-      actionText: "매물 EDA 분석에서 분포 확인",
-      targetMain: "analysis",
-      targetSub: "eda",
-    },
-    {
-      id: "alt-2",
-      level: "info",
-      title: "서울 권역 관측계수 AI 추천치 (1.085)",
-      category: "보정계수 산정",
-      description: "당산·영등포 권역 오피스 중앙 임대단가가 서울 전체 평균 대비 +8.5% 우세함에 따라 AI 관측계수가 1.085로 계산되었습니다.",
-      actionText: "보정계수 검토 및 조정",
-      targetMain: "analysis",
-      targetSub: "adjustment",
-    },
-    {
-      id: "alt-3",
-      level: "warning",
-      title: "네모 매물 중 근린생활시설 비중 24% 포함 검증",
-      category: "데이터 정합성",
-      description: "네모 플랫폼 수집 매물 중 일부 근생 용도가 포함되어 오피스 업무시설 필터링을 통해 자동 배제되었습니다.",
-      actionText: "데이터 검증 상세표 확인",
-      targetMain: "data",
-      targetSub: "validation",
-    },
-    {
-      id: "alt-4",
-      level: "success",
-      title: "5개 우체국보험회관 적정가격 산정 완료",
-      category: "확정 상태",
-      description: "2026년 2분기 V1 데이터셋 기준 5개 회관의 적정 임대기준가격 모델 계산이 완료되었습니다.",
-      actionText: "회관별 임대가격 산정 확인",
-      targetMain: "analysis",
-      targetSub: "valuation",
-    },
-  ];
+/**
+ * 검토 필요 항목.
+ *
+ * 예전에는 이 목록이 통째로 지어낸 것이었다 — "대구회관 연식 비교군 2건",
+ * "서울 권역 관측계수 1.085", "네모 근린생활시설 24%" 가 전부 고정 문구였고,
+ * 어떤 분기를 올려도 같은 4건이 떴다. Bootstrap 신뢰구간을 언급했지만 이 앱은
+ * Bootstrap 을 돌리지 않는다.
+ *
+ * 지금은 이번 분기 산정 결과에서 실제로 걸린 것만 만든다:
+ *   · 게이트에 걸려 중립화된 보정계수 (표본 5곳 미만 또는 IQR 15% 초과)
+ *   · 아직 확정하지 않은 회관
+ */
+export function AlertsSubView({ onNavigate, selectedDatasetId }: AlertsSubViewProps) {
+  const [calcs, setCalcs] = useState<CalculationResult[]>([]);
+  const [confirmed, setConfirmed] = useState<ConfirmedValuation[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const [c, v] = await Promise.all([
+          valuationRepository.getCalculationResultsByDataset(selectedDatasetId),
+          valuationRepository.listConfirmedValuationsByDataset(selectedDatasetId),
+        ]);
+        if (cancelled) return;
+        setCalcs(c);
+        setConfirmed(v);
+      } catch (err) {
+        console.error("경고 목록 로드 실패:", err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDatasetId]);
+
+  const alertsList = useMemo(() => {
+    const list: Array<{
+      id: string;
+      level: string;
+      title: string;
+      category: string;
+      description: string;
+      actionText: string;
+      targetMain: string;
+      targetSub: string;
+    }> = [];
+
+    const labels: Array<[keyof CalculationResult, string]> = [
+      ["zoneFactorDetail", "권역"],
+      ["sizeFactorDetail", "규모"],
+      ["ageFactorDetail", "연식"],
+    ];
+
+    calcs.forEach((c) => {
+      labels.forEach(([key, label]) => {
+        const d = c[key] as FactorDetail;
+        if (!d || d.isApplied !== false) return;
+        list.push({
+          id: `${c.buildingId}-${label}`,
+          level: "warning",
+          title: `${c.buildingName} ${label} 보정계수 중립화 (관측 ${d.observedFactor.toFixed(3)} → 1.000)`,
+          category: "게이트 발동",
+          description: d.reason,
+          actionText: "회관별 산정 근거 확인",
+          targetMain: "analysis",
+          targetSub: "valuation",
+        });
+      });
+    });
+
+    const unconfirmed = calcs.filter(
+      (c) => !confirmed.some((v) => v.buildingId === c.buildingId)
+    );
+    if (calcs.length > 0 && unconfirmed.length > 0) {
+      list.push({
+        id: "unconfirmed",
+        level: "info",
+        title: `미확정 회관 ${unconfirmed.length}곳`,
+        category: "확정 상태",
+        description: `${unconfirmed.map((c) => c.buildingName).join(", ")} 은(는) 아직 담당자 확정 전입니다. 확정해야 다음 분기 비교 기준이 됩니다.`,
+        actionText: "회관별 임대가격 산정으로 이동",
+        targetMain: "analysis",
+        targetSub: "valuation",
+      });
+    }
+
+    if (calcs.length > 0 && list.length === 0) {
+      list.push({
+        id: "ok",
+        level: "success",
+        title: `회관 ${calcs.length}곳 산정 완료 · 게이트 경고 없음`,
+        category: "확정 상태",
+        description: "이번 분기 산정에서 표본 부족·흩어짐 게이트에 걸린 항목이 없습니다.",
+        actionText: "회관별 임대가격 산정 확인",
+        targetMain: "analysis",
+        targetSub: "valuation",
+      });
+    }
+
+    return list;
+  }, [calcs, confirmed]);
 
   return (
     <div className="space-y-6">

@@ -5,25 +5,36 @@
 
 import React from "react";
 import { Layers, ShieldCheck, CheckCircle2, ListOrdered, Scale } from "lucide-react";
+import {
+  HALL_SPECS,
+  INITIAL_DEFAULT_EFFICIENCY_RATES as BASE,
+} from "../../services/rentalCalculationEngine";
 
+/**
+ * 참조 화면이므로 "저장된 기준 전용률표"를 보여주는 것이 맞다. 다만 예전에는 그
+ * 숫자를 손으로 옮겨 적어 둬서, 엔진의 표가 바뀌어도 이 화면은 옛 값 그대로였다.
+ * 이제 INITIAL_DEFAULT_EFFICIENCY_RATES 에서 직접 읽는다 — 사본을 두지 않는다.
+ */
 export function EfficiencyRateSubView() {
-  const regionalRates = [
-    { region: "서울", med: "50.6%", mean: "54.7%", sample: "150건", desc: "CBD/YBD/GBD 주요 오피스 평균 전용률" },
-    { region: "부산", med: "63.5%", mean: "63.8%", sample: "332건", desc: "서면·중구·시청 오피스 평균 전용률" },
-    { region: "대구", med: "62.2%", mean: "64.5%", sample: "236건", desc: "동대구·도심권 오피스 평균 전용률" },
-    { region: "광주", med: "68.8%", mean: "67.7%", sample: "190건", desc: "상무·금남로 오피스 평균 전용률" },
-  ];
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
-  const zoneRates = [
-    { zone: "서울 여의도(YBD)", rate: "50.4%", hall: "-" },
-    { zone: "서울 당산·문래", rate: "55.0%", hall: "당산회관 (55.0%)" },
-    { zone: "부산 중구·남포", rate: "59.8%", hall: "부산회관 (60.0%)" },
-    { zone: "부산진구 서면", rate: "65.8%", hall: "-" },
-    { zone: "대구 중구·도심", rate: "57.4%", hall: "대구회관 (60.0%)" },
-    { zone: "대구 수성구", rate: "62.2%", hall: "-" },
-    { zone: "광주 서구 상무", rate: "65.1%", hall: "광주회관 (68.0%)" },
-    { zone: "광주 동구 금남로", rate: "70.0%", hall: "-" },
-  ];
+  const regionalRates = Object.entries(BASE.regions).map(([region, r]) => ({
+    region,
+    med: pct(r.median),
+    sample: `${r.sampleCount}건`,
+  }));
+
+  const zoneRates = Object.entries(BASE.zones).map(([key, z]) => {
+    const [region, zone] = key.split("/");
+    const hall = HALL_SPECS.find((h) => h.region === region && h.zone === zone);
+    return {
+      zone: `${region} ${zone}`,
+      rate: pct(z.median),
+      sample: z.sampleCount,
+      fallbackUsed: z.fallbackUsed === true,
+      hall: hall ? hall.buildingName : "-",
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -42,7 +53,7 @@ export function EfficiencyRateSubView() {
         </div>
 
         <span className="text-xs font-mono font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl">
-          전국 통합 중앙값: 62.0%
+          전국 통합 중앙값: {pct(BASE.overall.median)} (표본 {BASE.overall.sampleCount}건)
         </span>
       </div>
 
@@ -70,7 +81,7 @@ export function EfficiencyRateSubView() {
             </span>
             <h4 className="font-bold text-white text-sm">권역별 중앙값 전용률</h4>
             <p className="text-slate-400 text-[11px] leading-relaxed">
-              전용면적이 누락된 경우, 동일 세부 상권/권역(예: 당산·문래 55.0%)의 전용률 중앙값을 보정 적용.
+              임대(계약)면적이 없어 매물 고유 전용률을 못 구하는 경우(네모 전부), 같은 권역의 전용률 중앙값을 대신 적용.
             </p>
           </div>
 
@@ -80,7 +91,8 @@ export function EfficiencyRateSubView() {
             </span>
             <h4 className="font-bold text-white text-sm">지역/전국 중앙값</h4>
             <p className="text-slate-400 text-[11px] leading-relaxed">
-              권역 표본이 미달인 경우 해당 시·도 광역 지역 중앙값 또는 전국 표준 전용률(62.0%)을 차순위 적용.
+              권역 표본이 5건 미만이면 해당 시·도 광역 지역 중앙값을, 그것도 없으면 전국 표준
+              전용률({pct(BASE.overall.median)})을 차순위 적용.
             </p>
           </div>
         </div>
@@ -95,12 +107,12 @@ export function EfficiencyRateSubView() {
               <div key={r.region} className="py-3 flex justify-between items-center text-xs">
                 <div>
                   <span className="font-bold text-slate-900 block text-sm">{r.region}</span>
-                  <span className="text-slate-500 text-[11px]">{r.desc}</span>
+                  <span className="text-slate-500 text-[11px]">알스퀘어 표본 중앙값</span>
                 </div>
 
                 <div className="text-right font-mono">
                   <span className="text-base font-black text-indigo-700 block">{r.med}</span>
-                  <span className="text-[10px] text-slate-400">평균 {r.mean} ({r.sample})</span>
+                  <span className="text-[10px] text-slate-400">표본 {r.sample}</span>
                 </div>
               </div>
             ))}
@@ -124,7 +136,15 @@ export function EfficiencyRateSubView() {
                     </span>
                   )}
                 </div>
-                <span className="font-extrabold text-indigo-700 text-sm">{z.rate}</span>
+                <div className="flex items-center gap-2">
+                  {z.fallbackUsed && (
+                    <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold font-sans">
+                      표본 부족 → 지역값
+                    </span>
+                  )}
+                  <span className="text-[10px] text-slate-400 font-sans">{z.sample}건</span>
+                  <span className="font-extrabold text-indigo-700 text-sm">{z.rate}</span>
+                </div>
               </div>
             ))}
           </div>
