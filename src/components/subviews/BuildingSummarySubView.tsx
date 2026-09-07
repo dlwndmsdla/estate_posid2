@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { activeBuildingsInfo } from "../../prdDataset";
+import { HALLS } from "../../services/halls";
 import { datasetRepository, valuationRepository } from "../../db/repository";
 import { CalculationResult, ConfirmedValuation, DatasetMetadata } from "../../types/dataset";
 import {
@@ -78,20 +78,20 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
 
       const prevMap: Record<string, number> = {};
 
-      for (const b of activeBuildingsInfo) {
+      for (const b of HALLS) {
         let rent: number | null = null;
         if (prevDs) {
-          const prevVal = await valuationRepository.getConfirmedValuation(prevDs.datasetId, b.id);
+          const prevVal = await valuationRepository.getConfirmedValuation(prevDs.datasetId, b.buildingId);
           if (prevVal) rent = prevVal.finalRent;
           else {
-            const prevCalc = await valuationRepository.getCalculationResult(prevDs.datasetId, b.id);
+            const prevCalc = await valuationRepository.getCalculationResult(prevDs.datasetId, b.buildingId);
             if (prevCalc) rent = prevCalc.finalRent;
           }
         }
         if (rent === null || (refYear <= 2026 && refQuarter <= 2)) {
-          rent = FIXED_BASELINES_2026Q1[b.id] ?? 0;
+          rent = FIXED_BASELINES_2026Q1[b.buildingId] ?? 0;
         }
-        prevMap[b.id] = rent;
+        prevMap[b.buildingId] = rent;
       }
 
       setPrevQuarterRents(prevMap);
@@ -178,16 +178,16 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
 
       {/* Building Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {activeBuildingsInfo.map((b) => {
-          const calc = calcs.find((c) => c.buildingId === b.id);
-          const conf = confirmedList.find((c) => c.buildingId === b.id);
+        {HALLS.map((b) => {
+          const calc = calcs.find((c) => c.buildingId === b.buildingId);
+          const conf = confirmedList.find((c) => c.buildingId === b.buildingId);
 
-          const baseRent = calc ? calc.baseRegionalRent : FIXED_BASELINES_2026Q1[b.id] ?? 0;
+          const baseRent = calc ? calc.baseRegionalRent : FIXED_BASELINES_2026Q1[b.buildingId] ?? 0;
           const aiRent = calc ? calc.recommendedRent : baseRent;
           const finalRent = conf ? conf.finalRent : calc ? calc.finalRent : aiRent;
 
-          const prevRent = prevQuarterRents[b.id] ?? FIXED_BASELINES_2026Q1[b.id] ?? 0;
-          const actualRent = actualRents[b.id] ?? Math.round(prevRent * 0.95);
+          const prevRent = prevQuarterRents[b.buildingId] ?? FIXED_BASELINES_2026Q1[b.buildingId] ?? 0;
+          const actualRent = actualRents[b.buildingId] ?? Math.round(prevRent * 0.95);
 
           const { factor, percentage } = calculateConversionFactor(actualRent, prevRent);
           const estimatedCurrentActualRent = Math.round(finalRent * factor);
@@ -196,14 +196,14 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
           const pct = prevRent > 0 ? ((diff / prevRent) * 100).toFixed(1) : "0.0";
           const isUp = diff >= 0;
 
-          const isInlineEditing = editingBuildingId === b.id;
+          const isInlineEditing = editingBuildingId === b.buildingId;
 
           return (
-            <div key={b.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition">
+            <div key={b.buildingId} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition">
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full font-mono">
-                    {b.city} • {b.tradeArea}
+                    {b.shortName} • {b.tradeArea}
                   </span>
                   <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -213,11 +213,11 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
 
                 <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-indigo-600" />
-                  {b.name}
+                  {b.buildingName}
                 </h3>
 
                 <p className="text-[11px] text-slate-500 leading-relaxed border-b border-slate-100 pb-2">
-                  {b.address} • 준공 {b.builtYear}년 • 연면적 {b.grossAreaSqm.toLocaleString()}㎡ • 전용률 {b.efficiencyRate}%
+                  {b.roadAddress} • 준공 {b.builtYear}년 • 연면적 {b.grossArea.toLocaleString()}㎡ • 전용률 {b.efficiencyRate}%
                 </p>
               </div>
 
@@ -250,7 +250,7 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
                         autoFocus
                       />
                       <button
-                        onClick={() => handleSaveInlineEdit(b.id)}
+                        onClick={() => handleSaveInlineEdit(b.buildingId)}
                         className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
                         title="저장"
                       >
@@ -268,7 +268,7 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
                     <div className="flex items-center gap-1.5">
                       <strong className="text-indigo-900 font-black text-sm">{actualRent.toLocaleString()} 원/㎡</strong>
                       <button
-                        onClick={() => handleStartInlineEdit(b.id, actualRent)}
+                        onClick={() => handleStartInlineEdit(b.buildingId, actualRent)}
                         className="p-1 text-slate-400 hover:text-indigo-600 transition rounded hover:bg-slate-200/60"
                         title="실계약단가 수정"
                       >
@@ -340,15 +340,15 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
             </p>
 
             <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-              {activeBuildingsInfo.map((b) => {
-                const prevRent = prevQuarterRents[b.id] ?? FIXED_BASELINES_2026Q1[b.id] ?? 0;
-                const currentVal = editForm[b.id] ?? Math.round(prevRent * 0.95);
+              {HALLS.map((b) => {
+                const prevRent = prevQuarterRents[b.buildingId] ?? FIXED_BASELINES_2026Q1[b.buildingId] ?? 0;
+                const currentVal = editForm[b.buildingId] ?? Math.round(prevRent * 0.95);
                 const { factor, percentage } = calculateConversionFactor(currentVal, prevRent);
 
                 return (
-                  <div key={b.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3 text-xs">
+                  <div key={b.buildingId} className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3 text-xs">
                     <div>
-                      <span className="font-bold text-slate-800 block">{b.name}</span>
+                      <span className="font-bold text-slate-800 block">{b.buildingName}</span>
                       <span className="text-[11px] text-slate-500 font-mono">
                         전분기 임대기준가: {prevRent.toLocaleString()}원
                       </span>
@@ -361,7 +361,7 @@ export function BuildingSummarySubView({ selectedDatasetId }: BuildingSummarySub
                           value={currentVal}
                           onChange={(e) => {
                             const val = Number(e.target.value);
-                            setEditForm((prev) => ({ ...prev, [b.id]: val }));
+                            setEditForm((prev) => ({ ...prev, [b.buildingId]: val }));
                           }}
                           className="w-28 px-2.5 py-1.5 border border-indigo-300 focus:border-indigo-600 rounded-lg text-right font-mono font-bold text-xs bg-white text-indigo-950"
                         />

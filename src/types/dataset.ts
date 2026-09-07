@@ -288,13 +288,11 @@ export interface EfficiencyRateTable {
 
 export interface HallComparisonRow {
   hallName: string;
+  region: string;
   zone: string;
   roadAddress: string;
+  /** 회관 실거래 임대료. 담당자가 1단계에서 고친 값이 있으면 그것을 쓴다. */
   realTransactionRentWon: number;
-  exclusiveRentWon: number;
-  contractRentByOverallWon: number;
-  contractRentByRegionWon: number;
-  contractRentByZoneWon: number;
 
   regionExclMedianRentWon: number;
   regionAppliedRate: number;

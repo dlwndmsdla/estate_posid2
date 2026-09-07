@@ -6,7 +6,7 @@
 import { useState, useEffect } from "react";
 import { DatasetMetadata, CalculationResult } from "../types/dataset";
 import { datasetRepository, valuationRepository } from "../db/repository";
-import { activeBuildingsInfo } from "../prdDataset";
+import { HALLS } from "../services/halls";
 import {
   Building2,
   TrendingUp,
@@ -57,9 +57,9 @@ export function OverallDashboardView({
           (d) => d.referenceYear === prevYear && d.referenceQuarter === prevQuarter
         );
         if (prevDs) {
-          for (const b of activeBuildingsInfo) {
-            const v = await valuationRepository.getConfirmedValuation(prevDs.datasetId, b.id);
-            if (v) prev[b.id] = v.finalRent;
+          for (const b of HALLS) {
+            const v = await valuationRepository.getConfirmedValuation(prevDs.datasetId, b.buildingId);
+            if (v) prev[b.buildingId] = v.finalRent;
           }
         }
       }
@@ -69,7 +69,7 @@ export function OverallDashboardView({
     }
   };
 
-  const selectedBuildingSpec = activeBuildingsInfo.find((b) => b.id === selectedBldgId) || activeBuildingsInfo[0];
+  const selectedBuildingSpec = HALLS.find((b) => b.buildingId === selectedBldgId) || HALLS[0];
 
   // 회관별 단가 — 산정 결과에서 유도한다. 예전엔 다섯 값이 상수로 박혀 있어
   // 어떤 데이터셋을 골라도 카드가 같은 숫자를 보여 줬다.
@@ -260,14 +260,14 @@ export function OverallDashboardView({
 
         {/* 5 Building Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {activeBuildingsInfo.map((b) => {
-            const isSelected = b.id === selectedBldgId;
-            const rData = buildingRents[b.id] || { rent: 0, prevRent: 0, changePct: 0 };
+          {HALLS.map((b) => {
+            const isSelected = b.buildingId === selectedBldgId;
+            const rData = buildingRents[b.buildingId] || { rent: 0, prevRent: 0, changePct: 0 };
 
             return (
               <button
-                key={b.id}
-                onClick={() => setSelectedBldgId(b.id)}
+                key={b.buildingId}
+                onClick={() => setSelectedBldgId(b.buildingId)}
                 className={`p-4 rounded-xl border text-left transition flex flex-col justify-between ${
                   isSelected
                     ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-indigo-500/50"
@@ -281,11 +281,11 @@ export function OverallDashboardView({
                         isSelected ? "bg-indigo-500/30 text-indigo-200" : "bg-indigo-50 text-indigo-700 border border-indigo-100"
                       }`}
                     >
-                      {b.city}
+                      {b.shortName}
                     </span>
                     <MapPin className={`w-3.5 h-3.5 ${isSelected ? "text-indigo-400" : "text-slate-400"}`} />
                   </div>
-                  <h4 className="font-bold text-xs">{b.name}</h4>
+                  <h4 className="font-bold text-xs">{b.buildingName}</h4>
                   <p className={`text-[10px] mt-0.5 truncate ${isSelected ? "text-slate-400" : "text-slate-500"}`}>
                     {b.tradeArea}
                   </p>
@@ -317,7 +317,7 @@ export function OverallDashboardView({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-bold">
               <span className="flex items-center gap-2 text-indigo-900 text-sm">
                 <Building2 className="w-4 h-4 text-indigo-600" />
-                {selectedBuildingSpec.name} ({selectedBuildingSpec.city}) 상세 스펙 및 산정 요약
+                {selectedBuildingSpec.buildingName} ({selectedBuildingSpec.shortName}) 상세 스펙 및 산정 요약
               </span>
               <button
                 onClick={() => onNavigateTab("s3", "valuation")}
@@ -336,7 +336,7 @@ export function OverallDashboardView({
               <div className="bg-white/80 p-2.5 rounded-lg border border-indigo-100">
                 <span className="text-slate-500 block">연면적 / 준공연도</span>
                 <strong className="text-slate-800 font-bold">
-                  {selectedBuildingSpec.grossAreaSqm.toLocaleString()}㎡ ({selectedBuildingSpec.builtYear}년)
+                  {selectedBuildingSpec.grossArea.toLocaleString()}㎡ ({selectedBuildingSpec.builtYear}년)
                 </strong>
               </div>
               <div className="bg-white/80 p-2.5 rounded-lg border border-indigo-100">
@@ -490,11 +490,11 @@ export function OverallDashboardView({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {activeBuildingsInfo.map((b) => {
-                const r = buildingRents[b.id] || { rent: 0, prevRent: 0, changePct: 0 };
+              {HALLS.map((b) => {
+                const r = buildingRents[b.buildingId] || { rent: 0, prevRent: 0, changePct: 0 };
                 return (
-                  <tr key={b.id} className="hover:bg-slate-50/80">
-                    <td className="py-3 px-3 font-bold text-slate-900">{b.name}</td>
+                  <tr key={b.buildingId} className="hover:bg-slate-50/80">
+                    <td className="py-3 px-3 font-bold text-slate-900">{b.buildingName}</td>
                     <td className="py-3 px-3 text-slate-500">{b.tradeArea}</td>
                     <td className="py-3 px-3 text-right font-mono text-slate-600">
                       {r.prevRent.toLocaleString()} 원
@@ -508,7 +508,7 @@ export function OverallDashboardView({
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-slate-500">
-                      {b.id === "dangsan" ? "-18.3%" : b.id === "yeongdeungpo" ? "-3.5%" : b.id === "busan" ? "+9.8%" : b.id === "daegu" ? "+87.6%" : "+24.8%"}
+                      {b.buildingId === "dangsan" ? "-18.3%" : b.buildingId === "yeongdeungpo" ? "-3.5%" : b.buildingId === "busan" ? "+9.8%" : b.buildingId === "daegu" ? "+87.6%" : "+24.8%"}
                     </td>
                   </tr>
                 );

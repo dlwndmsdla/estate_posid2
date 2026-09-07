@@ -11,7 +11,7 @@ import {
   CleanedListing,
   Method2SheetData,
 } from "../types/dataset";
-import { activeBuildingsInfo } from "../prdDataset";
+import { HALLS } from "../services/halls";
 import { getActualContractStore, saveActualContractRent } from "../services/actualContractStore";
 import {
   parseExcelFile,
@@ -371,14 +371,14 @@ export function UploadDatasetView({
               반입 자료 산정 시 담당자 판단 반영계수 참고 지표로 자동 반영됩니다.
             </p>
             <div className="space-y-1.5">
-              {activeBuildingsInfo.map((b) => {
+              {HALLS.map((b) => {
                 // 조사표에 없는 회관이면 0. 10,000 원을 넣으면 담당자가 입력한 값처럼 보인다.
-                const val = actualContractRents[b.id] ?? 0;
+                const val = actualContractRents[b.buildingId] ?? 0;
                 return (
-                  <div key={b.id} className="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/80 text-xs shadow-2xs">
+                  <div key={b.buildingId} className="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/80 text-xs shadow-2xs">
                     <span className="font-bold text-slate-700 text-xs flex items-center gap-1">
-                      <span>{b.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono font-normal">({b.city})</span>
+                      <span>{b.buildingName}</span>
+                      <span className="text-[10px] text-slate-400 font-mono font-normal">({b.shortName})</span>
                     </span>
                     <div className="flex items-center gap-1">
                       <input
@@ -386,8 +386,8 @@ export function UploadDatasetView({
                         value={val}
                         onChange={(e) => {
                           const num = Number(e.target.value);
-                          setActualContractRents((prev) => ({ ...prev, [b.id]: num }));
-                          saveActualContractRent(b.id, num);
+                          setActualContractRents((prev) => ({ ...prev, [b.buildingId]: num }));
+                          saveActualContractRent(b.buildingId, num);
                         }}
                         className="w-24 px-2 py-0.5 text-right font-mono font-extrabold text-indigo-900 bg-slate-50 border border-indigo-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />

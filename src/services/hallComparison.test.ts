@@ -5,6 +5,8 @@
 
 import { describe, expect, test } from "bun:test";
 import { calculateHallComparison } from "./rentalCalculationEngine";
+import { HALLS } from "./halls";
+import { getActualContractStore } from "./actualContractStore";
 import type { EfficiencyRateTable, RegionalConvertedListing } from "../types/dataset";
 
 const effTable: EfficiencyRateTable = {
@@ -40,8 +42,11 @@ function listing(
   };
 }
 
+/** 영등포회관 — 지역 "서울", 권역 "영등포". 이름 대신 권역으로 찾는다. */
 const 서울회관 = (ls: RegionalConvertedListing[]) =>
-  calculateHallComparison(effTable, ls).find((h) => h.hallName === "서울회관")!;
+  calculateHallComparison(effTable, ls).find(
+    (h) => h.region === "서울" && h.zone === "영등포"
+  )!;
 
 describe("calculateHallComparison — 업로드 매물에서 중앙값 산출", () => {
   test("지역 매물 중앙값은 그 지역 매물에서 나온다", () => {
@@ -89,5 +94,24 @@ describe("calculateHallComparison — 업로드 매물에서 중앙값 산출", 
     const h = 서울회관(ls);
     expect(h.regionListingsMedianRentWon).toBe(0);
     expect(h.zoneListingsMedianRentWon).toBe(0);
+  });
+});
+
+describe("회관 명단은 한 곳에서만 온다", () => {
+  test("회관 5곳이 모두 나온다 — 예전에는 당산이 빠져 4곳이었다", () => {
+    const rows = calculateHallComparison(effTable, []);
+    expect(rows.map((h) => h.zone).sort()).toEqual(
+      HALLS.map((h) => h.zone).sort()
+    );
+    expect(rows).toHaveLength(5);
+  });
+
+  test("실거래가는 회관 명단이 아니라 실거래 저장소에서 온다", () => {
+    const rows = calculateHallComparison(effTable, []);
+    const store = getActualContractStore();
+    rows.forEach((h) => {
+      const hall = HALLS.find((x) => x.zone === h.zone)!;
+      expect(h.realTransactionRentWon).toBe(store[hall.buildingId]);
+    });
   });
 });

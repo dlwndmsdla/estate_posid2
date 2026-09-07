@@ -14,6 +14,7 @@ import {
   CalculationResult,
   FactorDetail,
 } from "../types/dataset";
+import { HALLS } from "./halls";
 import { getActualContractStore } from "./actualContractStore";
 
 export function safeFactor(
@@ -732,13 +733,12 @@ export function aggregateBuildingMedians(
         zone: cl.zone,
         primaryUse: cl.primaryUse || raw?.primaryUse || "업무시설",
         // 준공연도가 없으면 0으로 둔다(연식군 필터가 0을 제외한다). 기본값 2005는 없는 값을
-        // 지어내는 것이고, 2000~2010년 준공 회관(대구 2003·광주 2008)의 연식 비교군에
+        // 지어내는 것이고, 2000~2010년 준공 회관(대구 2003·광주 2009)의 연식 비교군에
         // 결측 건물을 통째로 섞어 넣는다.
         // ⚠ 다만 지금은 방어선일 뿐 실효가 없다 — 파서(excelEngine.ts)와
         //   parseListingsFromWorkbook이 이미 결측 준공연도를 2005로 채워서 넘기기 때문이다.
-        //   원점을 고치려면 그 두 곳도 함께 손봐야 하고, 준공연도를 그대로 표시하는 화면
-        //   (RawDataViewer·MapContainer)에 0 처리를 넣어야 한다. 현재 분기 데이터는
-        //   준공연도 결측이 0건이라 실제 왜곡은 발생하지 않는다.
+        //   원점을 고치려면 그 두 곳을 함께 손봐야 한다. 현재 분기 데이터는 준공연도
+        //   결측이 0건이라 실제 왜곡은 발생하지 않는다.
         completionYear:
           Number.isFinite(raw?.builtYear) && (raw?.builtYear ?? 0) > 0 ? (raw!.builtYear as number) : 0,
         grossArea: raw?.grossFloorAreaSqm || 0,
@@ -798,59 +798,23 @@ export function calculateHallComparison(
   efficiencyTable: EfficiencyRateTable,
   convertedListings: RegionalConvertedListing[]
 ): HallComparisonRow[] {
-  const halls = [
-    {
-      hallName: "서울회관",
-      region: "서울",
-      zone: "영등포",
-      roadAddress: "서울특별시 영등포구 영등포동4가 425-2",
-      realTransactionRentWon: 13487,
-      exclusiveRentWon: 24789,
-    },
-    {
-      hallName: "부산회관",
-      region: "부산",
-      zone: "중구_남포중앙동",
-      roadAddress: "부산광역시 중구 중앙대로 63",
-      realTransactionRentWon: 9459,
-      exclusiveRentWon: 13423,
-    },
-    {
-      hallName: "대구회관",
-      region: "대구",
-      zone: "중구남구_도심",
-      roadAddress: "대구광역시 남구 중앙대로 200",
-      realTransactionRentWon: 5634,
-      exclusiveRentWon: 12879,
-    },
-    {
-      hallName: "광주회관",
-      region: "광주",
-      zone: "서구_상무",
-      roadAddress: "광주광역시 서구 상무중앙로 110",
-      realTransactionRentWon: 7077,
-      exclusiveRentWon: 7617,
-    },
-  ];
+  // 회관 실거래 임대료는 담당자가 고칠 수 있는 값이라 저장소에서 읽는다.
+  // 예전에는 이 함수 안에 회관 4곳이 주소·실거래가와 함께 통째로 다시 적혀 있었다.
+  const actualRents = getActualContractStore();
 
-  return halls.map((h) => {
-    const regRate = resolveRegionEfficiencyRate(h.region, efficiencyTable);
+  return HALLS.map((hall) => {
+    const regRate = resolveRegionEfficiencyRate(hall.region, efficiencyTable);
     const { rate: zoneRate, fallbackUsed: zoneFallback } = resolveZoneEfficiencyRate(
-      h.region,
-      h.zone,
+      hall.region,
+      hall.zone,
       efficiencyTable
     );
-    const overallRate = efficiencyTable.overallMedian || 0.62;
-
-    const contractByOverall = Math.round(h.exclusiveRentWon * overallRate);
-    const contractByRegion = Math.round(h.exclusiveRentWon * regRate);
-    const contractByZone = Math.round(h.exclusiveRentWon * zoneRate);
 
     // 업로드된 매물에서 직접 집계한다. 예전엔 회관별 중앙값이 상수로 박혀 있어
     // 어떤 파일을 올려도 이 표가 같은 숫자를 보여 줬다.
-    const regionListings = convertedListings.filter((c) => c.region === h.region);
+    const regionListings = convertedListings.filter((c) => c.region === hall.region);
     const zoneListings = convertedListings.filter(
-      (c) => c.region === h.region && c.zone === h.zone
+      (c) => c.region === hall.region && c.zone === hall.zone
     );
 
     const regionExclMedianRentWon = Math.round(
@@ -868,14 +832,11 @@ export function calculateHallComparison(
     );
 
     return {
-      hallName: h.hallName,
-      zone: h.zone,
-      roadAddress: h.roadAddress,
-      realTransactionRentWon: h.realTransactionRentWon,
-      exclusiveRentWon: h.exclusiveRentWon,
-      contractRentByOverallWon: contractByOverall,
-      contractRentByRegionWon: contractByRegion,
-      contractRentByZoneWon: contractByZone,
+      hallName: hall.buildingName,
+      region: hall.region,
+      zone: hall.zone,
+      roadAddress: hall.roadAddress,
+      realTransactionRentWon: actualRents[hall.buildingId] ?? 0,
 
       regionExclMedianRentWon,
       regionAppliedRate: regRate,
@@ -905,14 +866,11 @@ export function calculateHallComparison(
  * 1위였던 로직 그대로다(`260728_방법비교_계산.py` 의 `gate`).
  */
 
-/** 회관의 물리적 제원. 계산 결과가 아니라 건물 자체의 사실이라 고정값이다. */
-export const HALL_SPECS = [
-  { buildingId: "dangsan", buildingName: "당산회관", region: "서울", zone: "당산_문래", grossArea: 23573.93, builtYear: 2021 },
-  { buildingId: "yeongdeungpo", buildingName: "영등포회관", region: "서울", zone: "영등포", grossArea: 14476.76, builtYear: 1988 },
-  { buildingId: "busan", buildingName: "부산회관", region: "부산", zone: "중구_남포중앙동", grossArea: 33148.77, builtYear: 1989 },
-  { buildingId: "daegu", buildingName: "대구회관", region: "대구", zone: "중구남구_도심", grossArea: 22894.63, builtYear: 2003 },
-  { buildingId: "gwangju", buildingName: "광주회관", region: "광주", zone: "서구_상무", grossArea: 24200, builtYear: 2008 },
-] as const;
+/**
+ * 회관 명단 — 실제 값은 services/halls.ts 한 곳에만 있다.
+ * 산정 코드가 오래 쓰던 이름이라 여기서 다시 내보내기만 한다.
+ */
+export const HALL_SPECS = HALLS;
 
 /** 게이트 기준 — 표본 하한과 흩어짐 상한. */
 const FACTOR_MIN_SAMPLES = 5;
@@ -1150,13 +1108,10 @@ export function exportEfficiencyComparisonWorkbook(
   // Sheet 1: 시트1_회관비교
   const s1Data = hallRows.map((h) => ({
     회관: h.hallName,
+    지역: h.region,
     권역: h.zone,
     도로명주소: h.roadAddress,
     실거래가_원m2월: h.realTransactionRentWon,
-    전용단가_원m2: h.exclusiveRentWon,
-    전체전용률곱한전용단가_계약: h.contractRentByOverallWon,
-    지역전용률곱한전용단가_계약: h.contractRentByRegionWon,
-    권역전용률곱한전용단가_계약: h.contractRentByZoneWon,
     지역매물호가_전용단가중앙값: h.regionExclMedianRentWon,
     지역전용률: h.regionAppliedRate,
     지역매물호가_계약환산중앙값: h.regionListingsMedianRentWon,

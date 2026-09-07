@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { CleanedListing, BuildingMedian, CalculationResult, RawListing } from "../types/dataset";
 import { listingRepository, valuationRepository, datasetRepository } from "../db/repository";
-import { activeBuildingsInfo } from "../prdDataset";
+import { HALLS } from "../services/halls";
 import { HALL_SPECS, calculateEfficiencyRate } from "../services/rentalCalculationEngine";
 import {
   AlertTriangle,
@@ -137,18 +137,21 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
   // 예전에는 결과가 없으면 당산 10,672 / 그 외 11,121 원을 넣었는데, 근거 없는
   // 숫자가 차트에 회관 임대료로 찍히는 것이라 뺐다.
   const hallListings: ListingPlotData[] = useMemo(() => {
-    return activeBuildingsInfo.flatMap((b) => {
-      const calc = calcs.find((c) => c.buildingId === b.id);
+    return HALLS.flatMap((b) => {
+      const calc = calcs.find((c) => c.buildingId === b.buildingId);
       if (!calc) return [];
       return [{
         src: "우체국보험회관",
-        area: b.grossAreaSqm,
+        area: b.grossArea,
         unit: calc.finalRent,
-        use: "업무시설",
-        region: b.city,
-        zone: b.tradeArea,
+        use: b.useType,
+        // 지역·권역 필터가 매물 라벨("서울"/"당산_문래")로 돌아가는데 회관 점만
+        // 표기용 이름("당산"/"영등포·당산 상권")을 쓰고 있었다. 그래서 지역을
+        // 서울로 좁히면 회관 점이 통째로 사라졌다. 산정에 쓰는 라벨로 맞춘다.
+        region: b.region,
+        zone: b.zone,
         year: b.builtYear,
-        name: b.name,
+        name: b.buildingName,
         isHall: true,
       }];
     });

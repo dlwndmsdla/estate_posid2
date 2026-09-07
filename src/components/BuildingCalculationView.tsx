@@ -20,7 +20,7 @@ import {
   calculateBuildingMedians,
   calculateDatasetValuations,
 } from "../services/calculationEngine";
-import { activeBuildingsInfo } from "../prdDataset";
+import { HALLS } from "../services/halls";
 import {
   getActualContractStore,
   saveActualContractRent,
@@ -266,19 +266,19 @@ export function BuildingCalculationView({
   const datasetQuarterLabel = dataset
     ? `${dataset.referenceYear}년 ${dataset.referenceQuarter}분기`
     : "분기 미선택";
-  const activeSpec = activeBuildingsInfo.find((b) => b.id === selectedBuildingId) || activeBuildingsInfo[0];
+  const activeSpec = HALLS.find((b) => b.buildingId === selectedBuildingId) || HALLS[0];
 
   return (
     <div className="space-y-6">
       {/* Building Tabs Selector */}
       <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-sm overflow-x-auto">
         <div className="flex gap-2">
-          {activeBuildingsInfo.map((b) => {
-            const isActive = b.id === selectedBuildingId;
+          {HALLS.map((b) => {
+            const isActive = b.buildingId === selectedBuildingId;
             return (
               <button
-                key={b.id}
-                onClick={() => setSelectedBuildingId(b.id)}
+                key={b.buildingId}
+                onClick={() => setSelectedBuildingId(b.buildingId)}
                 className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                   isActive
                     ? "bg-slate-900 text-white shadow"
@@ -286,13 +286,13 @@ export function BuildingCalculationView({
                 }`}
               >
                 <Building2 className={`w-4 h-4 ${isActive ? "text-indigo-400" : "text-slate-400"}`} />
-                <span>{b.name}</span>
+                <span>{b.buildingName}</span>
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded font-mono ${
                     isActive ? "bg-indigo-500/30 text-indigo-200" : "bg-slate-200 text-slate-600"
                   }`}
                 >
-                  {b.city}
+                  {b.shortName}
                 </span>
               </button>
             );
@@ -308,7 +308,7 @@ export function BuildingCalculationView({
             <div className="space-y-1">
               <p className="text-sm font-bold text-slate-900">산정 결과가 없습니다</p>
               <p className="text-xs text-slate-600 leading-relaxed">
-                이 데이터셋에는 <span className="font-semibold">{activeSpec.name}</span> 의
+                이 데이터셋에는 <span className="font-semibold">{activeSpec.buildingName}</span> 의
                 비교 대상 매물이 없거나 아직 산정을 실행하지 않았습니다.
                 <br />
                 검증 화면에서 <span className="font-semibold">산정 실행</span> 을 먼저 눌러 주세요.
@@ -330,13 +330,13 @@ export function BuildingCalculationView({
                   VALUATION EXECUTIVE SUMMARY
                 </span>
                 <span className="text-xs text-slate-300 font-medium">
-                  {activeSpec.city} • {activeSpec.tradeArea} • {activeSpec.name}
+                  {activeSpec.shortName} • {activeSpec.tradeArea} • {activeSpec.buildingName}
                 </span>
               </div>
               <h2 className="text-xl font-extrabold text-white mt-1 flex items-center gap-2">
-                <span>{activeSpec.name} 임대가격 산정 결과</span>
+                <span>{activeSpec.buildingName} 임대가격 산정 결과</span>
                 <span className="text-xs text-slate-400 font-normal">
-                  (연면적 {activeSpec.grossAreaSqm.toLocaleString()}㎡, 준공 {activeSpec.builtYear}년, 전용률 {activeSpec.efficiencyRate}%)
+                  (연면적 {activeSpec.grossArea.toLocaleString()}㎡, 준공 {activeSpec.builtYear}년, 전용률 {activeSpec.efficiencyRate}%)
                 </span>
               </h2>
             </div>

@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { datasetRepository, valuationRepository } from "../../db/repository";
-import { activeBuildingsInfo } from "../../prdDataset";
+import { HALLS } from "../../services/halls";
 import { DatasetMetadata } from "../../types/dataset";
 import {
   getActualContractStore,
@@ -80,26 +80,26 @@ export function QuarterComparisonSubView({ selectedDatasetId }: QuarterCompariso
 
       const tableRows = [];
 
-      for (const b of activeBuildingsInfo) {
-        const conf = confs.find((c) => c.buildingId === b.id);
-        const calc = calcs.find((c) => c.buildingId === b.id);
-        const currentRent = conf ? conf.finalRent : calc ? calc.finalRent : FIXED_BASELINES[b.id] ?? 0;
+      for (const b of HALLS) {
+        const conf = confs.find((c) => c.buildingId === b.buildingId);
+        const calc = calcs.find((c) => c.buildingId === b.buildingId);
+        const currentRent = conf ? conf.finalRent : calc ? calc.finalRent : FIXED_BASELINES[b.buildingId] ?? 0;
 
         // Previous quarter baseline
         let prevRent: number | null = null;
         if (prevDs) {
-          const prevVal = await valuationRepository.getConfirmedValuation(prevDs.datasetId, b.id);
+          const prevVal = await valuationRepository.getConfirmedValuation(prevDs.datasetId, b.buildingId);
           if (prevVal) prevRent = prevVal.finalRent;
           else {
-            const prevCalc = await valuationRepository.getCalculationResult(prevDs.datasetId, b.id);
+            const prevCalc = await valuationRepository.getCalculationResult(prevDs.datasetId, b.buildingId);
             if (prevCalc) prevRent = prevCalc.finalRent;
           }
         }
         if (prevRent === null || (refYear <= 2026 && refQuarter <= 2)) {
-          prevRent = FIXED_BASELINES[b.id] ?? 0;
+          prevRent = FIXED_BASELINES[b.buildingId] ?? 0;
         }
 
-        const base2026Q1 = FIXED_BASELINES[b.id] ?? 0;
+        const base2026Q1 = FIXED_BASELINES[b.buildingId] ?? 0;
 
         const diffNum = currentRent - prevRent;
         const pctQoQ = prevRent > 0 ? ((diffNum / prevRent) * 100).toFixed(1) : "0.0";
@@ -109,9 +109,9 @@ export function QuarterComparisonSubView({ selectedDatasetId }: QuarterCompariso
         const pctYoY = base2026Q1 > 0 ? ((diffYoYNum / base2026Q1) * 100).toFixed(1) : "0.0";
 
         tableRows.push({
-          id: b.id,
-          name: `${b.name} (${b.city})`,
-          city: b.city,
+          id: b.buildingId,
+          name: `${b.buildingName} (${b.shortName})`,
+          city: b.shortName,
           currentRent,
           prevRent,
           q1_2026: base2026Q1,

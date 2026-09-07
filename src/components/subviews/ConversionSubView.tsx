@@ -136,6 +136,9 @@ export function ConversionSubView() {
     });
   }, [convertedListings, selectedSource, selectedRegion, selectedZone, searchQuery]);
 
+  /** 계산할 매물이 없으면 0 이 나온다. 0 원은 값이 아니라 없음이므로 그렇게 적는다. */
+  const won = (n: number) => (Number.isFinite(n) && n > 0 ? n.toLocaleString() : "—");
+
   // Export Excel workbook handler
   const handleExportWorkbook = () => {
     const year = selectedDataset?.referenceYear || 2026;
@@ -198,7 +201,17 @@ export function ConversionSubView() {
         </div>
 
         {/* Status Notice Banner */}
-        {efficiencyTable.isInitialDefaultUsed ? (
+        {rawListings.length === 0 ? (
+          <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 flex items-start gap-3 text-xs text-rose-900">
+            <AlertTriangle className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-bold">이 분기에 반입된 매물이 없습니다. </span>
+              아래 전용률표는 계산 결과가 아니라 2026-06-29 표본으로 만들어 앱에 저장해 둔
+              기준값이고, 회관 비교표의 매물호가 중앙값은 계산할 매물이 없어 전부 비어 있습니다.
+              <span className="font-bold"> 1단계 · 자료 반입</span>에서 분기 엑셀을 올려 주세요.
+            </div>
+          </div>
+        ) : efficiencyTable.isInitialDefaultUsed ? (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 text-xs text-amber-800">
             <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
             <div>
@@ -426,7 +439,7 @@ export function ConversionSubView() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <h3 id="hall-comparison-summary-title" className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-indigo-600" />
-                우체국보험회관 4개소 계약단가 환산 비교 (실거래가 vs 전용단가 환산)
+                우체국보험회관 5개소 계약단가 환산 비교 (실거래가 vs 매물호가 환산)
               </h3>
               <span className="text-[11px] text-slate-500 font-mono bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
                 ※ 환산산식 = 매물호가 전용단가 중앙값 × 적용 전용률
@@ -440,10 +453,6 @@ export function ConversionSubView() {
                     <th className="p-2.5">회관명</th>
                     <th className="p-2.5">권역</th>
                     <th className="p-2.5 text-right">실거래가 (원/㎡)</th>
-                    <th className="p-2.5 text-right">전용단가 (원/㎡)</th>
-                    <th className="p-2.5 text-right">전체전용률 (62%)</th>
-                    <th className="p-2.5 text-right">지역전용률 적용</th>
-                    <th className="p-2.5 text-right bg-indigo-50/70 text-indigo-900">권역전용률 적용</th>
                     <th className="p-2.5 text-right bg-slate-200/50 text-slate-900">
                       지역 매물호가 중앙값
                       <span className="block text-[10px] font-normal text-slate-500">(전용호가 × 지역전용률)</span>
@@ -460,38 +469,25 @@ export function ConversionSubView() {
                       <td className="p-2.5 font-sans font-bold text-slate-800">{h.hallName}</td>
                       <td className="p-2.5 font-sans text-slate-600">{h.zone}</td>
                       <td className="p-2.5 text-right font-medium text-slate-700">
-                        {h.realTransactionRentWon.toLocaleString()}
+                        {won(h.realTransactionRentWon)}
                       </td>
-                      <td className="p-2.5 text-right text-slate-700">
-                        {h.exclusiveRentWon.toLocaleString()}
-                      </td>
-                      <td className="p-2.5 text-right text-slate-600">
-                        {h.contractRentByOverallWon.toLocaleString()}
-                      </td>
-                      <td className="p-2.5 text-right text-slate-600">
-                        {h.contractRentByRegionWon.toLocaleString()}
-                      </td>
-                      <td className="p-2.5 text-right font-extrabold text-indigo-700 bg-indigo-50/40">
-                        {h.contractRentByZoneWon.toLocaleString()}
-                      </td>
-
                       {/* 지역 매물호가 중앙값 및 산식 */}
                       <td className="p-2.5 text-right bg-slate-50/50">
                         <div className="font-bold text-slate-800 text-sm">
-                          {h.regionListingsMedianRentWon.toLocaleString()} <span className="text-[11px] font-normal text-slate-500">원</span>
+                          {won(h.regionListingsMedianRentWon)} <span className="text-[11px] font-normal text-slate-500">원</span>
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                          {h.regionExclMedianRentWon.toLocaleString()}원 × {(h.regionAppliedRate * 100).toFixed(1)}%
+                          {won(h.regionExclMedianRentWon)}원 × {(h.regionAppliedRate * 100).toFixed(1)}%
                         </div>
                       </td>
 
                       {/* 권역 매물호가 중앙값 및 산식 (폴백 표기 포함) */}
                       <td className="p-2.5 text-right bg-indigo-50/30">
                         <div className="font-extrabold text-indigo-900 text-sm">
-                          {h.zoneListingsMedianRentWon.toLocaleString()} <span className="text-[11px] font-normal text-indigo-700">원</span>
+                          {won(h.zoneListingsMedianRentWon)} <span className="text-[11px] font-normal text-indigo-700">원</span>
                         </div>
                         <div className="text-[10px] text-indigo-800/80 font-mono mt-0.5 flex items-center justify-end gap-1">
-                          <span>{h.zoneExclMedianRentWon.toLocaleString()}원 × {(h.zoneAppliedRate * 100).toFixed(1)}%</span>
+                          <span>{won(h.zoneExclMedianRentWon)}원 × {(h.zoneAppliedRate * 100).toFixed(1)}%</span>
                           {h.isZoneFallback && (
                             <span className="text-[9px] text-amber-700 bg-amber-100 font-sans px-1 rounded font-bold" title="매물 수 부족(5건 미만)으로 지역 전용률 적용">
                               (지역폴백)
