@@ -4,7 +4,9 @@
  */
 
 import * as XLSX from "xlsx";
+import { parseMethod2Sheets } from "./method2Sheet";
 import {
+  Method2SheetData,
   RawListing,
   CleanedListing,
   ListingValidation,
@@ -35,6 +37,8 @@ export interface ExcelParseDiagnostic {
 export interface ExcelParseResult {
   fileHash: string;
   rawListings: RawListing[];
+  /** 발송본에 방법2 시트가 있으면 읽어 담는다. 없는 분기 파일이면 null. */
+  method2: Method2SheetData | null;
   unmappedColumns: string[];
   totalRowCount: number;
   diagnostic: ExcelParseDiagnostic;
@@ -639,6 +643,7 @@ export async function parseExcelFile(
   return {
     fileHash,
     rawListings,
+    method2: parseMethod2Sheets(workbook, datasetId),
     unmappedColumns: missingHeaders,
     totalRowCount: rawListings.length,
     diagnostic,

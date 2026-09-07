@@ -15,7 +15,7 @@ import {
 import { prdDataset, activeBuildingsInfo } from "../prdDataset";
 
 const DB_NAME = "RentBaselineDashboardDB";
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // v2: 방법2 시트 저장소 추가
 
 export const STORES = {
   DATASETS: "datasets",
@@ -25,6 +25,7 @@ export const STORES = {
   CALCULATION_RESULTS: "calculationResults",
   CONFIRMED_VALUATIONS: "confirmedValuations",
   UPLOAD_MAPPINGS: "uploadMappings",
+  METHOD2: "method2Sheets",
 } as const;
 
 export function openDatabase(): Promise<IDBDatabase> {
@@ -73,6 +74,11 @@ export function openDatabase(): Promise<IDBDatabase> {
 
       if (!db.objectStoreNames.contains(STORES.UPLOAD_MAPPINGS)) {
         db.createObjectStore(STORES.UPLOAD_MAPPINGS, { keyPath: "mappingName" });
+      }
+
+      // v2 추가. 기존 저장소는 위 가드 덕분에 그대로 유지된다(기존 데이터 보존).
+      if (!db.objectStoreNames.contains(STORES.METHOD2)) {
+        db.createObjectStore(STORES.METHOD2, { keyPath: "datasetId" });
       }
     };
 

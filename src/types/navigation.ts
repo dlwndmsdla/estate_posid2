@@ -21,6 +21,7 @@ export type SubMenuId =
   | "dashboard"
   | "valuation"
   | "adjustment"
+  | "method-comparison"
   // 4단계. 확정 (s4)
   | "quarterly-history"
   | "change-history"
@@ -81,6 +82,7 @@ export const mainNavigation: MainMenuItem[] = [
     children: [
       { id: "dashboard", label: "종합 현황 대시보드", description: "5개 보험회관 주요 산정지표, 총괄 현황 및 회관별 요약" },
       { id: "valuation", label: "회관별 임대가격 산정", description: "우체국보험회관 적정 임대기준가격 모델 산정 및 수기조정" },
+      { id: "method-comparison", label: "방법별 비교", description: "실거래 임대료 기준으로 방법1·2·4 추정치를 나란히 비교" },
       { id: "quarter-comparison", label: "분기별 비교", description: "분기별 임대기준가격 변동추이 및 시계열 분석" },
     ],
   },

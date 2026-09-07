@@ -24,6 +24,7 @@ import { FormulasView } from "./components/FormulasView";
 // SubViews
 import { BuildingSummarySubView } from "./components/subviews/BuildingSummarySubView";
 import { QuarterComparisonSubView } from "./components/subviews/QuarterComparisonSubView";
+import { MethodComparisonSubView } from "./components/subviews/MethodComparisonSubView";
 import { AlertsSubView } from "./components/subviews/AlertsSubView";
 import { ColumnMappingSubView } from "./components/subviews/ColumnMappingSubView";
 import { ComparableListingsSubView } from "./components/subviews/ComparableListingsSubView";
@@ -68,6 +69,8 @@ export default function App() {
     adjustment: ["s3", "adjustment"],
     calibration: ["s3", "adjustment"],
     "quarter-comparison": ["s3", "quarter-comparison"],
+    "method-comparison": ["s3", "method-comparison"],
+    "methods": ["s3", "method-comparison"],
     // Step 4
     "quarterly-history": ["s4", "quarterly-history"],
     history: ["s4", "quarterly-history"],
@@ -225,6 +228,10 @@ export default function App() {
                 handleNavigate("s3", "valuation");
               }}
             />
+          )}
+
+          {activeSubMenu === "method-comparison" && (
+            <MethodComparisonSubView selectedDatasetId={selectedDatasetId} />
           )}
 
           {activeSubMenu === "column-mapping" && <ColumnMappingSubView />}

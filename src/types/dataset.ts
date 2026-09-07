@@ -300,3 +300,67 @@ export interface HallComparisonRow {
   isZoneFallback: boolean;
   zoneListingsMedianRentWon: number;
 }
+
+/**
+ * 방법별 비교 섹션 — 분기 발송본 엑셀의 "방법2_유사군매칭"·"방법2_비교건물" 시트를 그대로 읽어 온다.
+ * 사이트에서 다시 계산하지 않는다. 숫자의 출처를 엑셀 한 곳으로 유지하기 위해서다.
+ */
+export interface Method2TierRow {
+  tier: string;              // "T1" | "T1+T2(기본15)" | "Top-30전체"
+  sampleCount: number;
+  askMedianWon: number | null;      // 호가 중앙값 (전용면적 기준)
+  byNationalRateWon: number | null; // × 전국 전용률
+  byRegionRateWon: number | null;   // × 지역 전용률
+  byZoneRateWon: number | null;     // × 권역 전용률
+  byCalibrationWon: number | null;  // × 보정계수 (기존 v6 방식)
+}
+
+export interface Method2HallRow {
+  hallName: string;
+  region: string;
+  zone: string;
+  grossAreaSqm: number | null;
+  completionYear: number | null;
+
+  currentRentWon: number | null;        // 현행 임대료 — 지금 적용 중인 계약 단가
+  realTransactionRentWon: number | null; // 실거래 임대료 (기준선)
+  realTransactionNote: string;           // 값에 붙은 단서 (예: 대구 이상값)
+  roneZoneAverageWon: number | null;     // 방법4 R-ONE 권역 평균
+  roneZoneLabel: string;
+  method1CascadeWon: number | null;      // 방법1 캐스케이드
+
+  tiers: Method2TierRow[];
+  nationalRate: number | null;
+  regionRate: number | null;
+  zoneRate: number | null;
+  zoneRateSource: string;
+  calibrationFactor: number | null;
+
+  method2RepresentativeWon: number | null; // 대표값 = 기본15 × 권역전용률
+  method2LowWon: number | null;
+  method2HighWon: number | null;
+
+  measuredAreaRatio: string;   // "15/15" — 비교건물 중 연면적이 실측인 비율
+  regionAreaCoverage: string;  // "120/135" — 지역 표본 전체의 연면적 커버리지
+}
+
+export interface Method2Candidate {
+  hallName: string;
+  rank: number;
+  inDefault15: boolean;
+  tier: string;
+  similarity: number | null;
+  buildingName: string;
+  address: string;
+  zone: string;
+  grossAreaSqm: number | null;
+  areaSource: string;   // "실측(대장)" | "중앙값 대체"
+  buildingAgeYears: number | null;
+  askRentPerExclusiveSqmWon: number | null;
+}
+
+export interface Method2SheetData {
+  datasetId: string;
+  halls: Method2HallRow[];
+  candidates: Method2Candidate[];
+}

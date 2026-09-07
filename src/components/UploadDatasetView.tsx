@@ -5,7 +5,12 @@
 
 import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { DatasetMetadata, RawListing, CleanedListing } from "../types/dataset";
+import {
+  DatasetMetadata,
+  RawListing,
+  CleanedListing,
+  Method2SheetData,
+} from "../types/dataset";
 import { activeBuildingsInfo } from "../prdDataset";
 import { getActualContractStore, saveActualContractRent } from "../services/actualContractStore";
 import {
@@ -30,6 +35,7 @@ import {
   listingRepository,
   mappingRepository,
   valuationRepository,
+  method2Repository,
 } from "../db/repository";
 import {
   Upload,
@@ -69,6 +75,7 @@ export function UploadDatasetView({
 
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [parsedRaw, setParsedRaw] = useState<RawListing[] | null>(null);
+  const [parsedMethod2, setParsedMethod2] = useState<Method2SheetData | null>(null);
   const [validationSummary, setValidationSummary] = useState<ExcelValidationSummary | null>(null);
   const [diagnostic, setDiagnostic] = useState<ExcelParseDiagnostic | null>(null);
   const [fileHash, setFileHash] = useState<string>("");
@@ -150,6 +157,7 @@ export function UploadDatasetView({
       // Call automatic parsing engine on "통합데이터" sheet
       const parseResult = await parseExcelFile(arrayBuffer, tempDatasetId);
       setParsedRaw(parseResult.rawListings);
+      setParsedMethod2(parseResult.method2);
       setDiagnostic(parseResult.diagnostic);
 
       // Check duplicate hash
@@ -228,6 +236,10 @@ export function UploadDatasetView({
       // Save to IndexedDB
       await datasetRepository.createDataset(metadata);
       await listingRepository.saveRawListings(datasetId, parsedRaw);
+      // 방법2 시트는 있을 때만 저장한다. 없는 분기 파일이면 화면이 "없음"으로 안내한다.
+      if (parsedMethod2) {
+        await method2Repository.save({ ...parsedMethod2, datasetId });
+      }
       await listingRepository.saveCleanedListings(
         datasetId,
         validationSummary.cleanedListings

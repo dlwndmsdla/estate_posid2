@@ -11,6 +11,7 @@ import {
   CalculationResult,
   ConfirmedValuation,
   DatasetStatus,
+  Method2SheetData,
 } from "../types/dataset";
 import { openDatabase, STORES } from "./idb";
 
@@ -272,6 +273,29 @@ export class ValuationRepository implements IValuationRepository {
   }
 }
 
+/** 방법2 시트 — 데이터셋 1개당 1건. 사이트가 계산하지 않고 엑셀에서 읽은 값을 그대로 보관한다. */
+export class Method2Repository {
+  async save(data: Method2SheetData): Promise<void> {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.METHOD2, "readwrite");
+      tx.objectStore(STORES.METHOD2).put(data);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async get(datasetId: string): Promise<Method2SheetData | null> {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.METHOD2, "readonly");
+      const req = tx.objectStore(STORES.METHOD2).get(datasetId);
+      req.onsuccess = () => resolve((req.result as Method2SheetData) || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+}
+
 export class MappingRepository implements IMappingRepository {
   async getMappingRule(): Promise<Record<string, string>> {
     const db = await openDatabase();
@@ -312,3 +336,4 @@ export const datasetRepository = new DatasetRepository();
 export const listingRepository = new ListingRepository();
 export const valuationRepository = new ValuationRepository();
 export const mappingRepository = new MappingRepository();
+export const method2Repository = new Method2Repository();
