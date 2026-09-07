@@ -4,10 +4,10 @@
  */
 
 import React, { useState, useEffect, useMemo } from "react";
-import { CleanedListing, BuildingMedian, CalculationResult } from "../types/dataset";
+import { CleanedListing, BuildingMedian, CalculationResult, RawListing } from "../types/dataset";
 import { listingRepository, valuationRepository, datasetRepository } from "../db/repository";
 import { activeBuildingsInfo } from "../prdDataset";
-import { HALL_SPECS } from "../services/rentalCalculationEngine";
+import { HALL_SPECS, calculateEfficiencyRate } from "../services/rentalCalculationEngine";
 import {
   AlertTriangle,
   BarChart3,
@@ -80,6 +80,7 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
   const [cleanedListings, setCleanedListings] = useState<CleanedListing[]>([]);
   const [buildingMedians, setBuildingMedians] = useState<BuildingMedian[]>([]);
   const [calcs, setCalcs] = useState<CalculationResult[]>([]);
+  const [rawListings, setRawListings] = useState<RawListing[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Filters
@@ -96,10 +97,14 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
       const listings = await listingRepository.getCleanedListings(selectedDatasetId);
       const medians = await listingRepository.getBuildingMedians(selectedDatasetId);
       const calcResults = await valuationRepository.getCalculationResultsByDataset(selectedDatasetId);
+      // 전용률은 원본 매물로만 구할 수 있다. CleanedListing.leaseArea 는 이름과 달리
+      // 전용면적이 그대로 들어가 있어(excelEngine.ts) 나누면 항상 1.0 이 나온다.
+      const raws = await listingRepository.getRawListings(selectedDatasetId);
 
       setCleanedListings(listings);
       setBuildingMedians(medians);
       setCalcs(calcResults);
+      setRawListings(raws);
     } catch (err) {
       console.error("EDA Data load error:", err);
     } finally {
@@ -257,59 +262,60 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
     return { rsquarePie, nemoPie };
   }, [filteredListings]);
 
-  // Regional Jeonyul Stats
+  /**
+   * 전용률 표본. 원본 매물에서 계약면적을 가진 것만 모은다.
+   *
+   * 산정 엔진과 같은 함수(calculateEfficiencyRate)를 쓴다 — 출처가 알스퀘어인지,
+   * 두 면적이 다 있는지, 비율이 20~95% 안인지를 그쪽 규칙 그대로 판정하기 위해서다.
+   * 예전 코드는 CleanedListing 의 exclusiveArea ÷ leaseArea 를 썼는데, leaseArea 에
+   * 전용면적이 그대로 들어가 있어 결과가 늘 1.0(100%)이었다.
+   */
+  const efficiencySamples = useMemo(() => {
+    return rawListings.flatMap((l) => {
+      const rate = calculateEfficiencyRate(l);
+      if (rate === null || !l.region) return [];
+      return [{ region: l.region, zone: l.zone || "", rate }];
+    });
+  }, [rawListings]);
+
+  const statsOfRates = (rates: number[]) => {
+    const sorted = [...rates].sort((a, b) => a - b);
+    const med = sorted[Math.floor(sorted.length / 2)];
+    const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
+    return { med: Number(med.toFixed(3)), mean: Number(mean.toFixed(3)), count: rates.length };
+  };
+
+  // 지역별 전용률. 표본 6건 미만인 지역은 뺀다.
+  // 예전에는 여기서 6/29 고정값(서울 0.506 등)을 대신 넣어, 어떤 파일을 올려도
+  // 같은 숫자가 나왔다.
   const jeonyulRegionData: JeonyulRegionStats[] = useMemo(() => {
-    const map: Record<string, number[]> = { 서울: [], 부산: [], 대구: [], 광주: [] };
-
-    // Calculate from cleaned listings if exclusiveArea/leaseArea exist
-    if (cleanedListings.length > 0) {
-      cleanedListings.forEach((c) => {
-        if (c.exclusiveArea && c.leaseArea && c.leaseArea > 0) {
-          const ratio = c.exclusiveArea / c.leaseArea;
-          if (map[c.region]) map[c.region].push(ratio);
-        }
-      });
-    }
-
-    // 표본이 6건 미만인 지역은 뺀다. 예전에는 여기서 6/29 고정값(서울 0.506 등)을
-    // 대신 넣었는데, 어떤 파일을 올려도 같은 숫자가 나와 검증이 불가능했다.
+    const map: Record<string, number[]> = {};
+    efficiencySamples.forEach((s) => {
+      (map[s.region] ||= []).push(s.rate);
+    });
     return Object.keys(map)
       .filter((reg) => map[reg].length > 5)
-      .map((reg) => {
-        const arr = map[reg];
-        const sorted = [...arr].sort((a, b) => a - b);
-        const med = sorted[Math.floor(sorted.length / 2)];
-        const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-        return { region: reg, med: Number(med.toFixed(3)), mean: Number(mean.toFixed(3)), count: arr.length };
-      });
-  }, [cleanedListings]);
+      .map((reg) => ({ region: reg, ...statsOfRates(map[reg]) }));
+  }, [efficiencySamples]);
 
-  // 권역별 전용률. 업로드된 매물에서 계산한다.
-  // 예전에는 이 블록 전체가 6/29 수치 11줄을 그대로 박아 둔 상수였고 useMemo 의존성도
-  // 비어 있어서, 어떤 분기를 올리든 같은 표가 나왔다.
+  // 권역별 전용률. 예전에는 이 블록 전체가 6/29 수치 11줄을 박아 둔 상수였고
+  // useMemo 의존성도 비어 있어서, 어떤 분기를 올리든 같은 표가 나왔다.
   const jeonyulZoneData: JeonyulZoneStats[] = useMemo(() => {
     const map: Record<string, { region: string; zone: string; rates: number[] }> = {};
-    cleanedListings.forEach((c) => {
-      if (!c.region || !c.zone) return;
-      if (!c.exclusiveArea || !c.leaseArea || c.leaseArea <= 0) return;
-      const key = `${c.region}/${c.zone}`;
-      if (!map[key]) map[key] = { region: c.region, zone: c.zone, rates: [] };
-      map[key].rates.push(c.exclusiveArea / c.leaseArea);
+    efficiencySamples.forEach((s) => {
+      if (!s.zone) return;
+      const key = `${s.region}/${s.zone}`;
+      (map[key] ||= { region: s.region, zone: s.zone, rates: [] }).rates.push(s.rate);
     });
 
     return Object.values(map)
       .filter((g) => g.rates.length > 5)
       .map((g) => {
-        const sorted = [...g.rates].sort((a, b) => a - b);
-        const med = sorted[Math.floor(sorted.length / 2)];
-        const mean = g.rates.reduce((a, b) => a + b, 0) / g.rates.length;
         const hall = HALL_SPECS.find((h) => h.region === g.region && h.zone === g.zone);
         return {
           region: g.region,
           zone: g.zone,
-          med: Number(med.toFixed(3)),
-          mean: Number(mean.toFixed(3)),
-          count: g.rates.length,
+          ...statsOfRates(g.rates),
           hallName: hall ? hall.buildingName : "",
         };
       })
