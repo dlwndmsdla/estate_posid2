@@ -288,8 +288,13 @@ export function MethodComparisonSubView({ selectedDatasetId }: { selectedDataset
             <p className="text-xs text-slate-500 leading-relaxed">
               이 화면은 발송본 엑셀의 <code className="bg-slate-100 px-1 rounded">방법2_유사군매칭</code> ·
               <code className="bg-slate-100 px-1 rounded ml-1">방법2_비교건물</code> 시트를 그대로 읽어 그립니다.
-              시트가 없는 분기 파일을 올리면 값을 지어내지 않고 이렇게 안내합니다.
-              두 시트가 들어 있는 엑셀을 <b>1단계 · 자료 반입</b>에서 다시 올려 주세요.
+              시트가 없는 파일을 올리면 값을 지어내지 않고 이렇게 안내합니다.
+            </p>
+            <p className="text-xs text-slate-500 leading-relaxed pt-1">
+              두 시트는 <b>분기 자동화가 만들어 붙입니다</b>(<code className="bg-slate-100 px-1 rounded">method2/build_sheets.py</code>).
+              <b> 2026-10-01 정기 실행분부터</b> 메일로 받는 통합 엑셀에 함께 들어 있으니, 그 파일을
+              <b> 1단계 · 자료 반입</b>에서 올리면 이 화면이 채워집니다. 그 이전에 만든 파일(예: 7월 검증용)에는
+              통합데이터 시트만 있어 여기서는 아무것도 그릴 수 없습니다.
             </p>
           </div>
         </div>
