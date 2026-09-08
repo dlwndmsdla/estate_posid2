@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
-import { DatasetMetadata, CalculationResult } from "../types/dataset";
-import { datasetRepository, valuationRepository } from "../db/repository";
+import { useState, useEffect, useMemo } from "react";
+import { DatasetMetadata, CalculationResult, CleanedListing } from "../types/dataset";
+import { datasetRepository, listingRepository, valuationRepository } from "../db/repository";
 import { HALLS } from "../services/halls";
+import { buildDataQualityAlerts } from "../services/datasetAlerts";
 import {
   Building2,
   TrendingUp,
@@ -34,6 +35,8 @@ export function OverallDashboardView({
   const [calcs, setCalcs] = useState<CalculationResult[]>([]);
   const [selectedBldgId, setSelectedBldgId] = useState<string>("dangsan");
   const [prevRents, setPrevRents] = useState<Record<string, number>>({});
+  const [listings, setListings] = useState<CleanedListing[]>([]);
+  const [buildingCount, setBuildingCount] = useState(0);
 
   useEffect(() => {
     loadDashboard();
@@ -64,6 +67,9 @@ export function OverallDashboardView({
         }
       }
       setPrevRents(prev);
+
+      setListings(await listingRepository.getCleanedListings(selectedDatasetId));
+      setBuildingCount((await listingRepository.getBuildingMedians(selectedDatasetId)).length);
     } catch (err: any) {
       console.error(err);
     }
@@ -90,6 +96,12 @@ export function OverallDashboardView({
   const shortQuarterLabel = dataset
     ? `${dataset.referenceYear} ${dataset.referenceQuarter}Q`
     : "-";
+
+  const alerts = useMemo(
+    () => buildDataQualityAlerts(listings, { buildingCount }),
+    [listings, buildingCount]
+  );
+  const warningCount = alerts.filter((a) => a.level === "경고").length;
 
   const hallRentAverage = calcs.length
     ? Math.round(calcs.reduce((sum, c) => sum + c.finalRent, 0) / calcs.length)
@@ -223,11 +235,21 @@ export function OverallDashboardView({
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-1">
           <span className="text-[11px] font-bold text-slate-400 block">주요 검토/경고 항목</span>
-          <span className="text-xl font-black font-mono text-amber-600 block">
-            4 <small className="text-xs text-slate-500 font-sans">건</small>
+          <span
+            className={`text-xl font-black font-mono block ${
+              warningCount > 0 ? "text-amber-600" : "text-emerald-600"
+            }`}
+          >
+            {alerts.length} <small className="text-xs text-slate-500 font-sans">건</small>
           </span>
-          <span className="text-[11px] text-amber-700 font-medium block truncate">
-            전환율 단일값 및 결측 4건 확인
+          <span
+            className={`text-[11px] font-medium block truncate ${
+              warningCount > 0 ? "text-amber-700" : "text-emerald-700"
+            }`}
+          >
+            {alerts.length === 0
+              ? "걸린 항목 없음"
+              : `경고 ${warningCount}건 · 정보 ${alerts.length - warningCount}건`}
           </span>
         </div>
       </div>
@@ -356,7 +378,9 @@ export function OverallDashboardView({
         )}
       </div>
 
-      {/* Audit Warnings & Check List */}
+      {/* Audit Warnings & Check List — 이번 분기 매물 데이터에서 실제로 걸린 것만 만든다.
+          예전에는 이 표가 통째로 고정 문구였고 건수까지 소스에 박혀 있어,
+          어떤 분기 엑셀을 올려도 같은 네 줄이 떴다. */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
@@ -364,8 +388,13 @@ export function OverallDashboardView({
               근거
             </span>
             <h3 className="text-base font-bold text-slate-900">
-              주요 경고 및 검토사항 (4건)
+              주요 경고 및 검토사항 ({alerts.length}건)
             </h3>
+            {listings.length > 0 && (
+              <span className="text-[11px] text-slate-400 font-mono">
+                검증 매물 {listings.length.toLocaleString()}건 기준
+              </span>
+            )}
           </div>
           <button
             onClick={() => onNavigateTab("s4", "alerts")}
@@ -376,91 +405,59 @@ export function OverallDashboardView({
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-                <th className="py-2.5 px-3 w-20">구분</th>
-                <th className="py-2.5 px-3">검토 항목 및 세부 내용</th>
-                <th className="py-2.5 px-3 text-right w-20">건수</th>
-                <th className="py-2.5 px-3 w-48">필요 자료 및 조치 사항</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <tr className="hover:bg-slate-50/80">
-                <td className="py-3 px-3">
-                  <span className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[10px]">
-                    경고
-                  </span>
-                </td>
-                <td className="py-3 px-3">
-                  <strong className="text-slate-800 block text-xs">전월세전환율 전국 단일값 적용 (5.6%)</strong>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    부산·대구·광주 오피스 개별 전환율 공표치 부재로 전국 단일값 5.6% 적용 중 (민감도 5%~7% 테스트 시 단가 변동률 2% 내외로 안정적)
-                  </p>
-                </td>
-                <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">3건</td>
-                <td className="py-3 px-3 text-slate-600 text-[11px]">
-                  부동산원 R-ONE 지방 오피스 전환율 확보
-                </td>
-              </tr>
-
-              <tr className="hover:bg-slate-50/80">
-                <td className="py-3 px-3">
-                  <span className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[10px]">
-                    경고
-                  </span>
-                </td>
-                <td className="py-3 px-3">
-                  <strong className="text-slate-800 block text-xs">주변역·거리 컬럼 위치 스왑 데이터</strong>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    지방 알스퀘어 시트 내 주변역 컬럼에 거리 숫자, 거리 컬럼에 역명이 입력된 행 존재 (타입 검사로 자동 교정)
-                  </p>
-                </td>
-                <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">755건</td>
-                <td className="py-3 px-3 text-slate-600 text-[11px]">
-                  크롤러 파서 매핑 자동 교정 완료
-                </td>
-              </tr>
-
-              <tr className="hover:bg-slate-50/80">
-                <td className="py-3 px-3">
-                  <span className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[10px]">
-                    경고
-                  </span>
-                </td>
-                <td className="py-3 px-3">
-                  <strong className="text-slate-800 block text-xs">분석 조건 제외 매물 행</strong>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    전세·매매 거래 조건 등으로 인해 전체 1,117건 중 11건이 월세 산정 대상에서 정상 제외
-                  </p>
-                </td>
-                <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">11건</td>
-                <td className="py-3 px-3 text-slate-600 text-[11px]">
-                  제외 사유 투명 표기 (숨김 없음)
-                </td>
-              </tr>
-
-              <tr className="hover:bg-slate-50/80">
-                <td className="py-3 px-3">
-                  <span className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[10px]">
-                    경고
-                  </span>
-                </td>
-                <td className="py-3 px-3">
-                  <strong className="text-slate-800 block text-xs">빌딩명 결측 및 주소/좌표 기반 건물동 그룹핑</strong>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    빌딩명 존재하는 매물 123건 / 도로명주소 + GPS 좌표 기준으로 유효 건물 354개동 클러스터링
-                  </p>
-                </td>
-                <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">994건</td>
-                <td className="py-3 px-3 text-slate-600 text-[11px]">
-                  건축물대장 주소 조인 강화
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        {listings.length === 0 ? (
+          <p className="text-xs text-slate-500 py-4 text-center">
+            이 분기에 검증된 매물 행이 없습니다. 1단계에서 엑셀을 올리고 2단계 검증을 실행하면
+            여기에 실제 데이터에서 걸린 항목이 나옵니다.
+          </p>
+        ) : alerts.length === 0 ? (
+          <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-3">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>
+              검증 매물 {listings.length.toLocaleString()}건에서 결측·제외·전환율 단일값으로 걸린 항목이
+              없습니다.
+            </span>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                  <th className="py-2.5 px-3 w-20">구분</th>
+                  <th className="py-2.5 px-3">검토 항목 및 세부 내용</th>
+                  <th className="py-2.5 px-3 text-right w-24">건수</th>
+                  <th className="py-2.5 px-3 w-48">필요 자료 및 조치 사항</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {alerts.map((a) => (
+                  <tr key={a.id} className="hover:bg-slate-50/80">
+                    <td className="py-3 px-3">
+                      <span
+                        className={`px-2 py-0.5 rounded font-bold text-[10px] border ${
+                          a.level === "경고"
+                            ? "bg-amber-100 text-amber-800 border-amber-200"
+                            : "bg-slate-100 text-slate-600 border-slate-200"
+                        }`}
+                      >
+                        {a.level}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <strong className="text-slate-800 block text-xs">{a.title}</strong>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{a.detail}</p>
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">
+                      {a.count.toLocaleString()}
+                      {a.countUnit}
+                    </td>
+                    <td className="py-3 px-3 text-slate-600 text-[11px]">{a.action}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Quarterly Rent Comparison Table */}
