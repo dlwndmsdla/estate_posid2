@@ -37,12 +37,6 @@ const BARS: {
     why: "연면적·연령이 비슷한 건물 15곳의 호가 중앙값 × 권역 전용률",
   },
   {
-    label: "방법2 보정계수적용",
-    key: "method2CalibratedWon" as keyof Method2HallRow,
-    fill: "#1baf7a",
-    why: "전용률 대신 실측 조사표에서 뽑은 보정계수를 곱한 값(기존 v6 방식)",
-  },
-  {
     label: "방법4 R-ONE 권역평균",
     key: "roneZoneAverageWon",
     fill: "#5c7a8c",
@@ -64,13 +58,7 @@ const diff = (v: number | null | undefined, base: number | null | undefined) => 
   return `${v >= base ? "+" : ""}${(((v - base) / base) * 100).toFixed(1)}%`;
 };
 
-/** 기본15 티어의 보정계수 값을 막대 하나로 쓰기 위해 평평하게 편다. */
-function withCalibrated(h: Method2HallRow) {
-  const base15 = h.tiers.find((t) => t.tier.includes("기본15")) ?? h.tiers[0];
-  return { ...h, method2CalibratedWon: base15?.byCalibrationWon ?? null };
-}
-
-function HallChart({ hall }: { hall: ReturnType<typeof withCalibrated> }) {
+function HallChart({ hall }: { hall: Method2HallRow }) {
   const refs = [
     { label: "실거래", value: hall.realTransactionRentWon, color: "#52514e", dash: "5 4", width: 1.8 },
     { label: "현행", value: hall.currentRentWon, color: "#9a988f", dash: "2 3", width: 1.4 },
@@ -272,7 +260,7 @@ export function MethodComparisonSubView({ selectedDatasetId }: { selectedDataset
     };
   }, [selectedDatasetId]);
 
-  const halls = useMemo(() => (data?.halls ?? []).map(withCalibrated), [data]);
+  const halls = useMemo(() => data?.halls ?? [], [data]);
 
   if (loading) {
     return <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-500">불러오는 중…</div>;
@@ -319,7 +307,7 @@ export function MethodComparisonSubView({ selectedDatasetId }: { selectedDataset
           회관별 비교 — 실거래 임대료 vs 방법1·2·4
         </h2>
         <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-          같은 회관을 네 가지 방법으로 추정해 실거래 임대료·현행 임대료와 나란히 놓습니다.
+          같은 회관을 세 가지 방법으로 추정해 실거래 임대료·현행 임대료와 나란히 놓습니다.
           어느 방법이 실거래에 가까운지, 방법2가 가정에 따라 얼마나 흔들리는지를 한 화면에서 봅니다.
           <b className="text-slate-700"> 이 화면은 값을 결정하지 않습니다</b> — 최종 임대료는 담당자가 정하며 여기서는 근거만 제시합니다.
         </p>
@@ -375,7 +363,7 @@ export function MethodComparisonSubView({ selectedDatasetId }: { selectedDataset
             <thead>
               <tr className="bg-slate-100 text-slate-600">
                 {["회관", "실거래(기준선)", "현행 임대료(보조선)", "방법1 캐스케이드", "방법2 전용률적용",
-                  "방법2 보정계수적용", "방법4 R-ONE 권역평균", "방법2 범위", "비교건물 중 연면적 실측"].map((h) => (
+                  "방법4 R-ONE 권역평균", "방법2 범위", "비교건물 중 연면적 실측"].map((h) => (
                   <th key={h} className="border border-slate-200 px-2 py-2 font-semibold">{h}</th>
                 ))}
               </tr>
@@ -405,7 +393,6 @@ export function MethodComparisonSubView({ selectedDatasetId }: { selectedDataset
                     {cell(h.currentRentWon)}
                     {cell(h.method1CascadeWon, true)}
                     {cell(h.method2RepresentativeWon, true)}
-                    {cell(h.method2CalibratedWon, true)}
                     {cell(h.roneZoneAverageWon, true)}
                     <td className="border border-slate-200 px-2 py-1.5 text-center tabular-nums text-slate-500">
                       {won(h.method2LowWon)}~{won(h.method2HighWon)}
