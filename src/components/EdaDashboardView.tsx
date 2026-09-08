@@ -15,6 +15,7 @@ import { listingRepository, valuationRepository, datasetRepository } from "../db
 import { HALLS } from "../services/halls";
 import {
   HALL_SPECS,
+  INITIAL_DEFAULT_EFFICIENCY_RATES as BASE_EFFICIENCY,
   calculateEfficiencyRate,
   runValuationPipeline,
 } from "../services/rentalCalculationEngine";
@@ -429,7 +430,14 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
         };
       })
       .sort((a, b) => a.region.localeCompare(b.region) || b.count - a.count);
-  }, [cleanedListings]);
+  }, [efficiencySamples]);
+
+  // 전국 중앙값. 상단 배지와 차트 기준선이 쓴다. 예전에는 둘 다 0.62 를 글자로
+  // 박아 둬서, 이번 분기 매물로 아무것도 계산하지 못했을 때조차 계산값처럼 보였다.
+  const nationalJeonyul = useMemo(() => {
+    const rates = efficiencySamples.map((s) => s.rate);
+    return rates.length > 0 ? statsOfRates(rates) : null;
+  }, [efficiencySamples]);
 
   const COLORS = ["#3b6fe0", "#12a150", "#f59e0b", "#a855f7", "#64748b", "#cbd5e1"];
 
@@ -808,16 +816,50 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
               호가(전용단가)를 계약단가로 환산 시 단일 전용률 대신 권역별 실제 중앙값 전용률을 적용하여 정교화
             </p>
           </div>
-          <span className="text-xs font-mono font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl">
-            전국 중앙값 전용률: 0.620 (62%)
-          </span>
+          {nationalJeonyul ? (
+            <span className="text-xs font-mono font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl">
+              이번 분기 전국 중앙값: {nationalJeonyul.med.toFixed(3)} (
+              {(nationalJeonyul.med * 100).toFixed(1)}%, {nationalJeonyul.count}건)
+            </span>
+          ) : (
+            <span className="text-xs font-mono font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-xl">
+              저장 기준표 중앙값: {BASE_EFFICIENCY.overall.median.toFixed(3)} (이번 분기 계산 불가)
+            </span>
+          )}
         </div>
 
+        {efficiencySamples.length === 0 ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-[11px] text-amber-900 leading-relaxed space-y-2">
+            <p>
+              <span className="font-bold">이 분기 파일로는 전용률을 계산할 수 없습니다. </span>
+              전용률 = 전용면적 ÷ 임대(계약)면적인데, 업로드된 매물에 임대면적이 없습니다.
+              네모는 임대면적을 아예 주지 않고, 알스퀘어는 통합데이터 시트에
+              "임대(계약)면적(㎡)" 열이 실려 있어야 매물마다 계산됩니다.
+            </p>
+            <p>
+              분기 수집 파이프라인은 2026-09-07부터 이 열을 통합데이터 맨 끝(49열)에 싣습니다.
+              그 뒤에 만들어진 발송본을 올리면 이 자리에 이번 분기 실측 전용률이 나옵니다.
+            </p>
+            <p>
+              그전까지 산정에는 저장된 기준 전용률표(2026-06-29 표본, 전국 중앙값{" "}
+              {BASE_EFFICIENCY.overall.median.toFixed(3)})가 그대로 쓰입니다. 실제 적용되는
+              값은 <span className="font-bold">참조 · 산출기준 › 전용률 기준 관리</span> 화면에
+              있습니다.
+            </p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Region Bar Chart */}
           <div className="space-y-2">
             <h4 className="text-xs font-bold text-slate-700">지역별 전용률 중앙값 vs 평균</h4>
-            <div className="h-64 w-full">
+            {jeonyulRegionData.length === 0 && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 leading-relaxed">
+                전용률을 구한 매물은 {efficiencySamples.length}건 있으나, 6건 이상 모인 지역이
+                없어 지역별 중앙값을 내지 않았습니다. 표본이 적은 지역 값은 한두 건에 끌려다녀
+                기준으로 쓸 수 없습니다.
+              </div>
+            )}
+            <div className={jeonyulRegionData.length === 0 ? "hidden" : "h-64 w-full"}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={jeonyulRegionData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -827,7 +869,14 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
                     formatter={(val: any) => [(Number(val) * 100).toFixed(1) + "%", "전용률"]}
                     contentStyle={{ fontSize: "11px" }}
                   />
-                  <ReferenceLine y={0.62} stroke="#e5484d" strokeDasharray="3 3" label="전국 62%" />
+                  <ReferenceLine
+                    y={nationalJeonyul?.med ?? BASE_EFFICIENCY.overall.median}
+                    stroke="#e5484d"
+                    strokeDasharray="3 3"
+                    label={`전국 ${(
+                      (nationalJeonyul?.med ?? BASE_EFFICIENCY.overall.median) * 100
+                    ).toFixed(1)}%`}
+                  />
                   <Bar dataKey="med" name="중앙값" fill="#3b6fe0" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="mean" name="평균" fill="#94a3b8" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -839,12 +888,10 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
           <div className="space-y-2">
             <h4 className="text-xs font-bold text-slate-700">주요 권역별 전용률 매트릭스</h4>
             {jeonyulZoneData.length === 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900 leading-relaxed">
-                <span className="font-bold">이 분기 파일로는 전용률을 계산할 수 없습니다. </span>
-                전용률 = 전용면적 ÷ 임대(계약)면적인데, 업로드된 매물에 임대면적이 없습니다.
-                네모는 임대면적을 주지 않고, 알스퀘어는 통합데이터에 임대(계약)면적 열이
-                실려 있어야 계산됩니다. 그 열이 없는 분기에는 전용률·계약환산에 저장된
-                기준 전용률표가 대신 쓰입니다.
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 leading-relaxed">
+                전용률을 구한 매물은 {efficiencySamples.length}건 있으나, 6건 이상 모인 권역이
+                없어 권역별 중앙값을 내지 않았습니다. 이 경우 산정은 한 단계 위인 지역 중앙값
+                전용률로 갑니다.
               </div>
             )}
             <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 text-xs font-mono">
@@ -879,6 +926,7 @@ export function EdaDashboardView({ selectedDatasetId, onNavigateTab }: EdaDashbo
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Section 7: EDA AI Calibration Review Matrix & Action Prompt */}
